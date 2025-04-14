@@ -20,17 +20,19 @@
             .editorPicture {
                 text-align: center;
             }
-            .displayText>p.md_blockquote {
+            .displayText blockquote {
                 background-color: darkgray;
                 margin-left: 1rem;
                 margin-right: 1rem;
                 padding-left: .2rem;
                 border-left: 0.2rem solid gray;
             }
-            .code-block {
+            .editorText .code-block, code {
                 font-family: monospace;
                 background-color: darkgray;
                 color: #333;
+            }
+            .code-block {
                 /* width: 80ch; */
                 margin-left: 1rem;
                 margin-right: 1rem;
@@ -43,15 +45,26 @@
             }
 
             .editorText .elem-btn-cont {position: absolute; left:10px; display: none;}
-            .editorText>textarea { width:100%; height: calc(10ch); display: none;}
-            .editorText.editMode>textarea{ display: block !important; }
+            .editorText textarea { width:100%; height: calc(10ch); display: none;}
+            .editorText.editMode textarea{ display: block !important; }
             .editorText.editMode .displayText { display: none;}
             .editorText.editMode .elem-btn-cont {display: block;}
             .editorPicture>img { 
                 display: inline-block;
                 max-width: 100%;
             }
-
+            .editorAction table {
+                width:100%;
+            }
+            .editorAction td {
+                text-align: left;
+            }
+            .editorAction button {
+                all:unset;
+                color:blue;
+                cursor:pointer;
+                text-decoration: underline;
+            }
             </style>
     </head>
     <body>
@@ -68,10 +81,10 @@
                 <h3>Heading three ###</h3>
                 <p>A single Paragraph</p>
                 <p>A paragraph with <b>bold</b> and <i>italic</i> text</p>
-                <p class="md_blockquote">
+                <blockquote>
                     This should be a seperate, indented thing<br>
                     Which can go on over mulitple lines
-                </p>
+                </blockquote>
                 <ol>
                     <li>Something</li>
                     <li>Something</li>
@@ -119,10 +132,22 @@ function test(){
                 im zweiten Fall wird das Ergebniss unten angezeigt. Danach wird keine Rechnung mehr evaluiert
             -->
         </div>
-        <div class="Action">
-            <!-- 
-            Act
-            -->
+        <div class="editorAction">
+            <input type="checkbox" id="action_0"><label>A new Checkbox</label><br>
+            <input type="checkbox" id="action_0"><label>A new Checkbox</label><br>
+            <input type="checkbox" id="action_0"><label>A new Checkbox</label><br>
+            <table>
+                <tr>
+                    <th>Action</th>
+                    <th>Wer</th>
+                    <th>Bis Wann</th>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" id="action_0"><label>A new Checkbox</label></td>
+                    <td><button>Add User</button></td>
+                    <td><button>Select Date</button></td>
+                </tr>
+            </table>
         </div>
         <button onclick="test()">Test</button>
     </body>
@@ -164,8 +189,9 @@ function test(){
             constructor(editorElementId) {
                 super(editorElementId, EditorType.TEXT);
                 this.pageElement = document.createElement("div");
+                this.pageElement.classList.add("editorText");
+                // Delete Button
                 this.buttonContainer = document.createElement("div");
-                this.pageElement.appendChild(this.buttonContainer);
                 this.buttonContainer.classList.add("elem-btn-cont");
                 let deleteButton = document.createElement("button");
                 deleteButton.innerHTML = "🗑️";
@@ -173,15 +199,18 @@ function test(){
                     this.delete();
                 }
                 this.buttonContainer.appendChild(deleteButton);
-                this.pageElement.classList.add("editorText");
+                this.pageElement.appendChild(this.buttonContainer);
+                // Textarea element for editor mode
                 this.textareaElement = document.createElement("textarea")
                 this.pageElement.appendChild(this.textareaElement);
                 this.pageElement.ondblclick = () => {
                     this.toggleEditor();
                 };
+                // Display element for display mode
                 this.displayElement = document.createElement("div");
                 this.displayElement.classList.add("displayText");
                 this.pageElement.appendChild(this.displayElement);
+                // Append to body
                 document.body.appendChild(this.pageElement);
             }
 
@@ -197,13 +226,56 @@ function test(){
 
             render(){
                 console.error("Implement a Parser for Markdown. Only basic syntax, no pictures");
-                const result = [];
-                const input = this.textareaElement.value.split("\n");
-                for (line in input)
-                {
-                    if ()
-                }
-                this.displayElement.replaceChildren(...result);
+                let data = this.textareaElement.value;
+                this.displayElement.innerHTML = this.replaceMD(data);
+            }
+
+            replaceMD(markdown)
+            {
+                // Escape HTML
+                markdown = markdown.replace(/&/g, "&amp;")
+                                    .replace(/</g, "&lt;")
+                                    .replace(/>/g, "&gt;");
+
+                // Code blocks (```...```)
+                markdown = markdown.replace(/```([\s\S]*?)```/g, (_, code) =>
+                    `<pre class="code-block"><code>${code}</code></pre>`
+                );
+
+                // Inline code (`...`)
+                markdown = markdown.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+                // Headings
+                markdown = markdown.replace(/^###### (.*)$/gm, '<h6>$1</h6>');
+                markdown = markdown.replace(/^##### (.*)$/gm, '<h5>$1</h5>');
+                markdown = markdown.replace(/^#### (.*)$/gm, '<h4>$1</h4>');
+                markdown = markdown.replace(/^### (.*)$/gm, '<h3>$1</h3>');
+                markdown = markdown.replace(/^## (.*)$/gm, '<h2>$1</h2>');
+                markdown = markdown.replace(/^# (.*)$/gm, '<h1>$1</h1>');
+
+                // Blockquotes
+                markdown = markdown.replace(/^> (.*)$/gm, '<blockquote>$1</blockquote>');
+
+                // Bold
+                markdown = markdown.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                markdown = markdown.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+                // Italic
+                markdown = markdown.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                markdown = markdown.replace(/_(.*?)_/g, '<em>$1</em>');
+
+                // Ordered Lists
+                markdown = markdown.replace(/^\d+\. (.*)$/gm, '<li>$1</li>');
+                markdown = markdown.replace(/(<li>.*<\/li>)/gms, '<ol>$1</ol>');
+
+                // Unordered Lists
+                markdown = markdown.replace(/^[-+*] (.*)$/gm, '<li>$1</li>');
+                markdown = markdown.replace(/(<li>.*<\/li>)/gms, '<ul>$1</ul>');
+
+                // Paragraphs (lines that don't already have tags)
+                markdown = markdown.replace(/^(?!<h|<ul>|<ol>|<li>|<blockquote>|<pre>|<p>|<code>)(.+)$/gm, '<p>$1</p>');
+
+                return markdown;
             }
 
             delete(){
@@ -213,7 +285,7 @@ function test(){
         }
 
         class EditorPicture extends EditorElement{
-            imageData;
+        imageData;
             constructor(editorElementId){
                 super(editorElementId, EditorType.PICTURE);
             }
