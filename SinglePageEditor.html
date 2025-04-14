@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style type="text/css">
+            body {
+                font-family: monospace;
+                font-size: 16px;
+                width: calc(80ch);
+                margin: 0 auto 0 auto;
+            }
+            .editorText, .editorPicture {
+                width:100%;
+                align-items: center;
+                margin: 1rem auto 0 auto;
+                background-color: blue;
+                border: 5px black;
+                border-radius: 3px;
+                border-style: ridge;
+            }
+            .editorPicture {
+                text-align: center;
+            }
+            .displayText>p.md_blockquote {
+                background-color: darkgray;
+                margin-left: 1rem;
+                margin-right: 1rem;
+                padding-left: .2rem;
+                border-left: 0.2rem solid gray;
+            }
+            .code-block {
+                font-family: monospace;
+                background-color: darkgray;
+                color: #333;
+                /* width: 80ch; */
+                margin-left: 1rem;
+                margin-right: 1rem;
+                padding-left: .2rem;
+                overflow-x: auto;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                border-left: 0.2rem solid #c7254e;
+                box-sizing: border-box;
+            }
+
+            .editorText .elem-btn-cont {position: absolute; left:10px; display: none;}
+            .editorText>textarea { width:100%; height: calc(10ch); display: none;}
+            .editorText.editMode>textarea{ display: block !important; }
+            .editorText.editMode .displayText { display: none;}
+            .editorText.editMode .elem-btn-cont {display: block;}
+            .editorPicture>img { 
+                display: inline-block;
+                max-width: 100%;
+            }
+
+            </style>
+    </head>
+    <body>
+        <div
+            class="editorText"
+            id="1">
+            <div class="elem-btn-cont">
+                <button>🗑️</button>
+            </div>
+            <textarea></textarea>
+            <div class="displayText">
+                <h1>Heading one #</h1>
+                <h2>Heading two ##</h2>
+                <h3>Heading three ###</h3>
+                <p>A single Paragraph</p>
+                <p>A paragraph with <b>bold</b> and <i>italic</i> text</p>
+                <p class="md_blockquote">
+                    This should be a seperate, indented thing<br>
+                    Which can go on over mulitple lines
+                </p>
+                <ol>
+                    <li>Something</li>
+                    <li>Something</li>
+                    <li>Something</li>
+                    <li>Something</li>
+                </ol>
+                <ol>
+                    <li>Something</li>
+                    <li>Something</li>
+                    <li>Something</li>
+                    <li>Something</li>
+                </ol>
+                <pre class="code-block"><code>
+class EditorPicture extends EditorElement{
+    imageData;
+    constructor(editorElementId){
+        super(editorElementId, EditorType.PICTURE);
+    }
+}
+
+function test(){
+    let el = new EditorText("123");
+}
+                </code></pre>
+            </div>
+        </div>
+        <div class="editorPicture">
+            <img
+                src = "C:\Users\Alain\Music\dresden_anna\_1320091.jpg"
+            >
+        </div>
+        <div class="editorCalculator">
+            <!--
+            Wird die Textklasse zum Anzeigen benutzen
+            Zum Editieren:
+                Variablen mussen definiert werden (oben)
+                Variablen beginnen immer mit einem Buchstaben
+                
+                pro Zeile eine Rechnung
+                eine Rechnung besteht immer aus 
+                    rechenweg=variable
+                oder
+                    rechenweg
+                im ersten Fall fuellt die Rechnung die Variable
+                im zweiten Fall wird das Ergebniss unten angezeigt. Danach wird keine Rechnung mehr evaluiert
+            -->
+        </div>
+        <div class="Action">
+            <!-- 
+            Act
+            -->
+        </div>
+        <button onclick="test()">Test</button>
+    </body>
+    <script type="text/javascript">
+        let lstPageElements = [];
+        const EditorType = Object.freeze({
+            TEXT:0,
+            PICTURE:1,
+            // ACTION:2,
+            // FIVEWHY:3,
+            // FISHBONE:4,
+            // SWOT:5,
+            // DATE_CREATE:6,
+            // CALCULATOR:7,
+            // VOTE:8,
+        })
+
+        class EditorElement{
+            editorElementId;
+            type;
+            constructor(editorElementId, type){
+                this.editorElementId = editorElementId;
+                this.type = type;
+            }
+            toggleEditor(){
+                console.error("Should be implemented by Class");
+            }
+            delete (){
+                let idx = lstPageElements.findIndex( el => el === this);
+                lstPageElements.splice(idx, 1);
+            }
+        }
+
+        class EditorText extends EditorElement{
+            pageElement;
+            displayElement;
+            textareaElement;
+            buttonContainer;
+            constructor(editorElementId) {
+                super(editorElementId, EditorType.TEXT);
+                this.pageElement = document.createElement("div");
+                this.buttonContainer = document.createElement("div");
+                this.pageElement.appendChild(this.buttonContainer);
+                this.buttonContainer.classList.add("elem-btn-cont");
+                let deleteButton = document.createElement("button");
+                deleteButton.innerHTML = "🗑️";
+                deleteButton.onclick = () => {
+                    this.delete();
+                }
+                this.buttonContainer.appendChild(deleteButton);
+                this.pageElement.classList.add("editorText");
+                this.textareaElement = document.createElement("textarea")
+                this.pageElement.appendChild(this.textareaElement);
+                this.pageElement.ondblclick = () => {
+                    this.toggleEditor();
+                };
+                this.displayElement = document.createElement("div");
+                this.displayElement.classList.add("displayText");
+                this.pageElement.appendChild(this.displayElement);
+                document.body.appendChild(this.pageElement);
+            }
+
+            toggleEditor(){
+                console.log(this);
+                if (this.pageElement.classList.contains("editMode")){
+                    this.pageElement.classList.remove("editMode");
+                    this.render();
+                }
+                else
+                    this.pageElement.classList.add("editMode");
+            }
+
+            render(){
+                console.error("Implement a Parser for Markdown. Only basic syntax, no pictures");
+                const result = [];
+                const input = this.textareaElement.value.split("\n");
+                for (line in input)
+                {
+                    if ()
+                }
+                this.displayElement.replaceChildren(...result);
+            }
+
+            delete(){
+                this.pageElement.remove();
+                super.delete();
+            }
+        }
+
+        class EditorPicture extends EditorElement{
+            imageData;
+            constructor(editorElementId){
+                super(editorElementId, EditorType.PICTURE);
+            }
+        }
+
+        function test(){
+            let el = new EditorText("123");
+        }
+    </script>
+</html>
