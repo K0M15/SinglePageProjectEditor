@@ -3,7 +3,7 @@
     <head>
         <style type="text/css">
             body {
-                font-family: monospace;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                 font-size: 16px;
                 width: calc(80ch);
                 margin: 0 auto 0 auto;
@@ -21,19 +21,19 @@
                 text-align: center;
             }
             .displayText blockquote {
+                font-family: 'Courier New', Courier, monospace;
                 background-color: darkgray;
-                margin-left: 1rem;
-                margin-right: 1rem;
+                margin: 0 1rem 0 1rem;
                 padding-left: .2rem;
                 border-left: 0.2rem solid gray;
             }
-            .editorText .code-block, code {
+            .code-block, code {
+                font-family: 'Courier New', Courier, monospace;
                 font-family: monospace;
                 background-color: darkgray;
                 color: #333;
             }
             .code-block {
-                /* width: 80ch; */
                 margin-left: 1rem;
                 margin-right: 1rem;
                 padding-left: .2rem;
@@ -232,11 +232,14 @@ function test(){
 
             replaceMD(markdown)
             {
+                
                 // Escape HTML
                 markdown = markdown.replace(/&/g, "&amp;")
-                                    .replace(/</g, "&lt;")
-                                    .replace(/>/g, "&gt;");
-
+                    .replace(/</g, "&lt;")
+                    .replace(/(?<!^)>/gm, "&gt;");
+                
+                // Blockquotes
+                markdown = markdown.replace(/^> (.*)$/gm, '<blockquote>$1</blockquote>');
                 // Code blocks (```...```)
                 markdown = markdown.replace(/```([\s\S]*?)```/g, (_, code) =>
                     `<pre class="code-block"><code>${code}</code></pre>`
@@ -252,10 +255,7 @@ function test(){
                 markdown = markdown.replace(/^### (.*)$/gm, '<h3>$1</h3>');
                 markdown = markdown.replace(/^## (.*)$/gm, '<h2>$1</h2>');
                 markdown = markdown.replace(/^# (.*)$/gm, '<h1>$1</h1>');
-
-                // Blockquotes
-                markdown = markdown.replace(/^> (.*)$/gm, '<blockquote>$1</blockquote>');
-
+               
                 // Bold
                 markdown = markdown.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
                 markdown = markdown.replace(/__(.*?)__/g, '<strong>$1</strong>');
@@ -293,6 +293,47 @@ function test(){
 
         function test(){
             let el = new EditorText("123");
+            el.textareaElement.value = `# Heading 1
+
+## Heading 2
+
+### Heading 3
+
+#### Heading 4
+
+##### Heading 5
+
+###### Heading 6
+
+This is a paragraph with **bold text**, *italic text*, and \`inline code\`.
+
+Another paragraph with __bold__ and _italic_ using underscores.
+
+> This is a blockquote.
+> It can span multiple lines.
+
+- Unordered item one
+- Unordered item two
+* Also works with asterisks
++ And plus signs too
+
+1. Ordered item one
+2. Ordered item two
+3. Ordered item three
+
+Here is a code block:
+\`\`\`
+function hello(name) { console.log("Hello, " + name); } hello("Markdown");
+\`\`\`
+
+Mixing all:
+
+> Here's a blockquote with **bold**, _italic_, and a list:
+> - Item A
+> - Item B
+
+A final paragraph.`;
+            el.render();
         }
     </script>
 </html>
