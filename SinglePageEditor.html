@@ -49,10 +49,18 @@
             .editorText.editMode textarea{ display: block !important; }
             .editorText.editMode .displayText { display: none;}
             .editorText.editMode .elem-btn-cont {display: block;}
+            .editorPicture.editMode>.edit{
+                display: block;
+                margin:1rem 0 1rem 0;
+            }
             .editorPicture>img { 
                 display: inline-block;
                 max-width: 100%;
             }
+            .editorPicture>.edit{
+                display: none;
+            }
+            .editorPicture.editMode>img { display: none; }
             .editorAction table {
                 width:100%;
             }
@@ -68,50 +76,15 @@
             </style>
     </head>
     <body>
-        <div
-            class="editorText"
-            id="1">
-            <div class="elem-btn-cont">
-                <button>🗑️</button>
+        <div class="editorPicture editMode">
+            <div class="edit">
+                <label class="file-button">
+                    <button>Choose Image</button>
+                    <input type="file" accept="image/*,.svg" hidden>
+                </label>
+                <input type="text" placeholder="Paste Webpath"><br>
+                <button>Close</button>
             </div>
-            <textarea></textarea>
-            <div class="displayText">
-                <h1>Heading one #</h1>
-                <h2>Heading two ##</h2>
-                <h3>Heading three ###</h3>
-                <p>A single Paragraph</p>
-                <p>A paragraph with <b>bold</b> and <i>italic</i> text</p>
-                <blockquote>
-                    This should be a seperate, indented thing<br>
-                    Which can go on over mulitple lines
-                </blockquote>
-                <ol>
-                    <li>Something</li>
-                    <li>Something</li>
-                    <li>Something</li>
-                    <li>Something</li>
-                </ol>
-                <ol>
-                    <li>Something</li>
-                    <li>Something</li>
-                    <li>Something</li>
-                    <li>Something</li>
-                </ol>
-                <pre class="code-block"><code>
-class EditorPicture extends EditorElement{
-    imageData;
-    constructor(editorElementId){
-        super(editorElementId, EditorType.PICTURE);
-    }
-}
-
-function test(){
-    let el = new EditorText("123");
-}
-                </code></pre>
-            </div>
-        </div>
-        <div class="editorPicture">
             <img
                 src = "C:\Users\Alain\Music\dresden_anna\_1320091.jpg"
             >
@@ -149,7 +122,7 @@ function test(){
                 </tr>
             </table>
         </div>
-        <button onclick="test()">Test</button>
+        <button id="pageEnd" onclick="test()">Test</button>
     </body>
     <script type="text/javascript">
         let lstPageElements = [];
@@ -186,7 +159,7 @@ function test(){
             displayElement;
             textareaElement;
             buttonContainer;
-            constructor(editorElementId) {
+            constructor(editorElementId, inser) {
                 super(editorElementId, EditorType.TEXT);
                 this.pageElement = document.createElement("div");
                 this.pageElement.classList.add("editorText");
@@ -211,11 +184,12 @@ function test(){
                 this.displayElement.classList.add("displayText");
                 this.pageElement.appendChild(this.displayElement);
                 // Append to body
-                document.body.appendChild(this.pageElement);
+                document.body.insertBefore(
+                    this.pageElement,
+                    document.getElementById("pageEnd"));
             }
 
             toggleEditor(){
-                console.log(this);
                 if (this.pageElement.classList.contains("editMode")){
                     this.pageElement.classList.remove("editMode");
                     this.render();
@@ -225,7 +199,6 @@ function test(){
             }
 
             render(){
-                console.error("Implement a Parser for Markdown. Only basic syntax, no pictures");
                 let data = this.textareaElement.value;
                 this.displayElement.innerHTML = this.replaceMD(data);
             }
@@ -285,55 +258,80 @@ function test(){
         }
 
         class EditorPicture extends EditorElement{
-        imageData;
+            pageElement;
+            imageElement;
+            editorElement;
+            fileSelectorElement;
+            linkSelectorElement;
+            imageData;
             constructor(editorElementId){
                 super(editorElementId, EditorType.PICTURE);
+                this.pageElement = document.createElement("div");
+                this.pageElement.classList.add("editorPicture", "editMode");
+                this.imageElement = document.createElement("img");
+                this.imageElement.src = "";
+                this.editorElement = document.createElement("div");
+                this.editorElement.classList.add("edit");
+                let btn_file = document.createElement("button");
+                let lbl_file = document.createElement("label");
+                this.fileSelectorElement = document.createElement("input");
+                btn_file.innerText = "Select Local";
+                btn_file.onclick = () => {
+                    this.fileSelectorElement.click();
+                }
+                this.fileSelectorElement.type = "file";
+                this.fileSelectorElement.accept = "image/*,.svg";
+                this.fileSelectorElement.hidden = true;
+                lbl_file.classList.add = "file-button";
+                lbl_file.appendChild(btn_file);
+                lbl_file.appendChild(this.fileSelectorElement);
+                this.linkSelectorElement = document.createElement("input");
+                this.linkSelectorElement.type = "text";
+                this.linkSelectorElement.placeholder = "Paste Webpath";
+                this.editorElement.appendChild(lbl_file);
+                this.editorElement.appendChild(this.linkSelectorElement);
+                let btn_close = document.createElement("button");
+                btn_close.onclick = () => {
+                    this.toggleEditor();
+                }
+                btn_close.innerText = "Close";  
+                this.editorElement.appendChild(btn_close);
+                this.pageElement.appendChild(this.editorElement);
+                this.pageElement.appendChild(this.imageElement);
+                this.pageElement.ondblclick = () => {
+                    this.toggleEditor();
+                };
+                document.body.insertBefore(
+                    this.pageElement,
+                    document.getElementById("pageEnd"));
+            }
+
+            toggleEditor(){
+                if (this.pageElement.classList.contains("editMode")){
+                    this.pageElement.classList.remove("editMode");
+                    if (this.linkSelectorElement.value)
+                        this.imageElement.src = this.linkSelectorElement.value;
+                    else if (this.fileSelectorElement.value){
+                        const file = this.fileSelectorElement.files[0];
+                        if (!file) return;
+
+                        const reader = new FileReader();
+                        reader.onload = (e) => { this.imageElement.src = e.target.result; };
+                        reader.readAsDataURL(file);
+                    }
+                }
+                else
+                    this.pageElement.classList.add("editMode");
+            }
+            
+            delete(){
+                this.pageElement.remove();
+                super.delete();
             }
         }
 
         function test(){
-            let el = new EditorText("123");
-            el.textareaElement.value = `# Heading 1
-
-## Heading 2
-
-### Heading 3
-
-#### Heading 4
-
-##### Heading 5
-
-###### Heading 6
-
-This is a paragraph with **bold text**, *italic text*, and \`inline code\`.
-
-Another paragraph with __bold__ and _italic_ using underscores.
-
-> This is a blockquote.
-> It can span multiple lines.
-
-- Unordered item one
-- Unordered item two
-* Also works with asterisks
-+ And plus signs too
-
-1. Ordered item one
-2. Ordered item two
-3. Ordered item three
-
-Here is a code block:
-\`\`\`
-function hello(name) { console.log("Hello, " + name); } hello("Markdown");
-\`\`\`
-
-Mixing all:
-
-> Here's a blockquote with **bold**, _italic_, and a list:
-> - Item A
-> - Item B
-
-A final paragraph.`;
-            el.render();
+            let el = new EditorPicture("123");
         }
     </script>
 </html>
