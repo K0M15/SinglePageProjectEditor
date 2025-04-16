@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
     <head>
+        <!-- Maybe ill find a cdn without the usa -->
         <style type="text/css">
             body {
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -67,28 +68,18 @@
             .editorAction td {
                 text-align: left;
             }
-            .editorAction button {
+            .editorAction button:not(.new) {
                 all:unset;
                 color:blue;
                 cursor:pointer;
                 text-decoration: underline;
             }
+            .editorActionLastRow {
+                text-align: right;
+            }
             </style>
     </head>
     <body>
-        <div class="editorPicture editMode">
-            <div class="edit">
-                <label class="file-button">
-                    <button>Choose Image</button>
-                    <input type="file" accept="image/*,.svg" hidden>
-                </label>
-                <input type="text" placeholder="Paste Webpath"><br>
-                <button>Close</button>
-            </div>
-            <img
-                src = "C:\Users\Alain\Music\dresden_anna\_1320091.jpg"
-            >
-        </div>
         <div class="editorCalculator">
             <!--
             Wird die Textklasse zum Anzeigen benutzen
@@ -105,31 +96,16 @@
                 im zweiten Fall wird das Ergebniss unten angezeigt. Danach wird keine Rechnung mehr evaluiert
             -->
         </div>
-        <div class="editorAction">
-            <input type="checkbox" id="action_0"><label>A new Checkbox</label><br>
-            <input type="checkbox" id="action_0"><label>A new Checkbox</label><br>
-            <input type="checkbox" id="action_0"><label>A new Checkbox</label><br>
-            <table>
-                <tr>
-                    <th>Action</th>
-                    <th>Wer</th>
-                    <th>Bis Wann</th>
-                </tr>
-                <tr>
-                    <td><input type="checkbox" id="action_0"><label>A new Checkbox</label></td>
-                    <td><button>Add User</button></td>
-                    <td><button>Select Date</button></td>
-                </tr>
-            </table>
-        </div>
-        <button id="pageEnd" onclick="test()">Test</button>
+        <button id="pageEnd" onclick="addNewEditorElement(EditorType.TEXT)">+ Text</button>
+        <button onclick="addNewEditorElement(EditorType.PICTURE)">+ Picture</button>
+        <button onclick="addNewEditorElement(EditorType.ACTION)">+ Action</button>
     </body>
     <script type="text/javascript">
         let lstPageElements = [];
         const EditorType = Object.freeze({
             TEXT:0,
             PICTURE:1,
-            // ACTION:2,
+            ACTION:2,
             // FIVEWHY:3,
             // FISHBONE:4,
             // SWOT:5,
@@ -330,8 +306,134 @@
             }
         }
 
-        function test(){
-            let el = new EditorPicture("123");
+        class EditorActionElement{
+            done;
+            description;
+            responsible;
+            date;
+            constructor(){
+                this.done = false;
+                this.description = null;
+                this.responsible = null;
+                this.date = null;
+            }
+            static fromData(done, description, responsible, date){
+                let elem = []
+                elem.done = done;
+                elem.description = description;
+                elem.responsible = responsible;
+                elem.date = date;
+                return (elem);
+            }
+        }
+
+        class EditorAction extends EditorElement{
+            pageElement;
+            data;
+            constructor(editorElementId){
+                super(editorElementId, EditorType.ACTION);
+                this.data = [
+                    ["Description", "Responsible", "Date"]
+                ]
+                this.pageElement = document.createElement("div");
+                this.pageElement.classList.add("editorAction");
+                document.body.insertBefore(
+                    this.pageElement,
+                    document.getElementById("pageEnd"));
+                this.render();
+            }
+
+            render(){
+                let result = document.createElement("table")
+                // Header
+                let header = document.createElement("tr");
+                header.append(...this.data[0].map((e)=>{
+                    let el = document.createElement("th");
+                    el.innerText = e;
+                    return el;
+                }));
+                result.appendChild(header);
+                // Rows
+                let ctr = 1;
+                while (ctr < this.data.length){
+                    let row = document.createElement("tr");
+                    row.append(...this.data[ctr].map((e, index) => this.handleFieldData(e, ctr, index)));
+                    result.appendChild(row);
+                    ctr++;
+                }
+                // Edit row
+                let row = document.createElement("tr");
+                row.classList.add("editorActionLastRow");
+                let btn_add_new = document.createElement("button");
+                btn_add_new.onclick = () => { this.add_row(); }
+                btn_add_new.innerText = "Add";
+                btn_add_new.classList.add("new");
+                row.appendChild(btn_add_new);
+                result.appendChild(row);
+                this.pageElement.replaceChildren(result);
+            }
+
+            add_row(){
+                this.data.push([null, null, null]);
+                this.render();
+            }
+
+            handleFieldData(data, row, col){
+                let result = document.createElement("td");
+                const add_edit_handler = () =>{
+                    result.ondblclick = () => {
+                        let in_data = document.createElement("input");
+                        in_data.onblur = (e) => {
+                            this.data[row][col] = in_data.value;
+                            this.render();
+                        }
+                        result.replaceChildren(in_data);
+                        in_data.focus();
+                    }
+                }
+                if(!isNaN(Date.parse(data))){
+                    result.innerText = data.toLocaleDateString();
+                    add_edit_handler();
+                }
+                else if (
+                    (typeof data === "string" || data instanceof String)
+                    && data != ""
+                    ){
+                    result.innerText = data;
+                    add_edit_handler();
+                }   
+                else if (data === null || data == "")
+                {
+                    let in_data = document.createElement("input");
+                    in_data.onblur = (e) => {
+                        this.data[row][col] = in_data.value;
+                        this.render();
+                    }
+                    result.appendChild(in_data);
+                }
+                return result;
+            }
+        }
+
+        function addNewEditorElement(type){
+            let nextId = lstPageElements.length;
+            switch(type)
+            {
+                case EditorType.TEXT:
+                    lstPageElements.push(new EditorText(nextId))
+                    break;
+                case EditorType.PICTURE:
+                    lstPageElements.push(new EditorPicture(nextId))
+                    break;
+                case EditorType.ACTION:
+                    lstPageElements.push(new EditorAction(nextId))
+                    break;
+                default:
+                    console.error("EditorType not implemented")
+            }
+        }
+
+        function saveState(){
         }
     </script>
 </html>

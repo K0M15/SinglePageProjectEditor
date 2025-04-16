@@ -16,19 +16,25 @@ Since the whole Website should be saved, no problems with versions should occur.
 This project is in the early stages of development.
 
 ## Currently Working
-  Basic Text
+- Text with Basic Markdown https://www.markdownguide.org/cheat-sheet/
+- Pictures
 
 ## Still to create
+- Delete Button to Pictures
+- Move the panels
 ### Templates
-- Text with Basic Markdown
-- Pictures
 - 5Why
 - Fishbone
 - SWOT-Analysis
 - Actions
+    - Additional Columns
+    - Sortable
+    - Moveable Columns
+    - DateSelector
 - Dates
 - Tables
 - A calculator
+- A Help Overlay
 
 ### Functionality
  - Save as new page (to keep contents)
