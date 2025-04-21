@@ -98,7 +98,9 @@
         </div>
         <button id="pageEnd" onclick="addNewEditorElement(EditorType.TEXT)">+ Text</button>
         <button onclick="addNewEditorElement(EditorType.PICTURE)">+ Picture</button>
-        <button onclick="addNewEditorElement(EditorType.ACTION)">+ Action</button>
+        <button onclick="addNewEditorElement(EditorType.ACTION)">+ Action</button><br>
+        <button onclick="saveState()">Save in Browser</button>
+        <button onclick="loadState()">Load from Browser</button>
     </body>
     <script type="text/javascript">
         let lstPageElements = [];
@@ -135,7 +137,7 @@
             displayElement;
             textareaElement;
             buttonContainer;
-            constructor(editorElementId, inser) {
+            constructor(editorElementId) {
                 super(editorElementId, EditorType.TEXT);
                 this.pageElement = document.createElement("div");
                 this.pageElement.classList.add("editorText");
@@ -231,6 +233,24 @@
                 this.pageElement.remove();
                 super.delete();
             }
+            
+            async serialize(){
+                return {
+                    type:this.type,
+                    text:this.textareaElement.value,
+                    editorElementId:this.editorElementId,
+                };
+            }
+
+            static fromDataObj(obj){
+                if (obj.editorElementId === undefined || obj.text === undefined){
+                    throw Error("obj corrupted");
+                }
+                const res = new EditorText(obj.editorElementId);
+                res.textareaElement.value = obj.text;
+                res.render();
+                return res;
+            }
         }
 
         class EditorPicture extends EditorElement{
@@ -304,26 +324,47 @@
                 this.pageElement.remove();
                 super.delete();
             }
-        }
 
-        class EditorActionElement{
-            done;
-            description;
-            responsible;
-            date;
-            constructor(){
-                this.done = false;
-                this.description = null;
-                this.responsible = null;
-                this.date = null;
+            async saveLoadedImageData(){
+                const cache = await caches.open("spe-images");
+                const response = await fetch(this.imageElement.src);
+                if (!response.ok) throw Error(`Could not fetch image \
+                    ${this.editorElementId} from Source ${this.imageElement.src}\
+                    `);
+                const blob = await response.blob();
+                const cacheKey = `http://synthetic.spe/${this.editorElementId}`;
+                await cache.put(
+                    new Request(cacheKey),
+                    new Response(blob, {headers: { "Content-Type": blob.type }})
+                );
+                return cacheKey;
             }
-            static fromData(done, description, responsible, date){
-                let elem = []
-                elem.done = done;
-                elem.description = description;
-                elem.responsible = responsible;
-                elem.date = date;
-                return (elem);
+            
+            async serialize(){
+                return {
+                    editorElementId:this.editorElementId,
+                    type:this.type,
+                    src:await this.saveLoadedImageData(),
+                };
+            }
+
+            static fromDataObj(obj){
+                if (obj.editorElementId === undefined || obj.src === undefined){
+                    throw Error("obj corrupted");
+                }
+                const res = new EditorPicture(obj.editorElementId);
+                caches.open("spe-images").then((cache) => 
+                    cache.match(obj.src).then((resp) =>
+                        resp.blob().then((blob) => {
+                            res.imageElement.src = URL.createObjectURL(blob);
+                            res.linkSelectorElement.value = res.imageElement.src;
+                        })
+                    )
+                )
+                // res.imageElement.src = obj.src;
+                // res.imageElement.linkSelectorElement.value = obj.src;
+                res.toggleEditor();
+                return res;
             }
         }
 
@@ -333,7 +374,7 @@
             constructor(editorElementId){
                 super(editorElementId, EditorType.ACTION);
                 this.data = [
-                    ["Description", "Responsible", "Date"]
+                    ["", "Description", "Responsible", "Date"]
                 ]
                 this.pageElement = document.createElement("div");
                 this.pageElement.classList.add("editorAction");
@@ -374,7 +415,7 @@
             }
 
             add_row(){
-                this.data.push([null, null, null]);
+                this.data.push([false, null, null, null]);
                 this.render();
             }
 
@@ -391,7 +432,18 @@
                         in_data.focus();
                     }
                 }
-                if(!isNaN(Date.parse(data))){
+                if(col == 0)
+                {
+                    let check = document.createElement("input");
+                    check.type = "checkbox";
+                    check.onchange = () => {
+                        console.log(check.checked);
+                        this.data[row][col] = check.checked;
+                    }
+                    check.checked = data;
+                    result.appendChild(check);
+                }
+                else if(!isNaN(Date.parse(data))){
                     result.innerText = data.toLocaleDateString();
                     add_edit_handler();
                 }
@@ -413,27 +465,102 @@
                 }
                 return result;
             }
-        }
+        
+            async serialize(){
+                return {
+                    type:this.type,
+                    editorElementId:this.editorElementId,
+                    data:this.data
+                };
+            }
 
-        function addNewEditorElement(type){
-            let nextId = lstPageElements.length;
-            switch(type)
-            {
-                case EditorType.TEXT:
-                    lstPageElements.push(new EditorText(nextId))
-                    break;
-                case EditorType.PICTURE:
-                    lstPageElements.push(new EditorPicture(nextId))
-                    break;
-                case EditorType.ACTION:
-                    lstPageElements.push(new EditorAction(nextId))
-                    break;
-                default:
-                    console.error("EditorType not implemented")
+            static fromDataObj(obj){
+                if (obj.editorElementId === undefined || obj.data === undefined){
+                    throw Error("obj corrupted");
+                }
+                const res = new EditorAction(obj.editorElementId);
+                res.data = obj.data;
+                res.render();
+                return res;
             }
         }
 
-        function saveState(){
+        function addNewEditorElement(type, obj){
+            let nextId = obj?obj.editorElementId:lstPageElements.length;
+            switch(type)
+            {
+                case EditorType.TEXT:
+                    lstPageElements.push(
+                        obj?EditorText.fromDataObj(obj):new EditorText(nextId)
+                    );
+                    break;
+                case EditorType.PICTURE:
+                    lstPageElements.push(
+                        obj?EditorPicture.fromDataObj(obj):new EditorPicture(nextId)
+                    );
+                    break;
+                case EditorType.ACTION:
+                    lstPageElements.push(
+                        obj?EditorAction.fromDataObj(obj):new EditorAction(nextId)
+                    );
+                    break;
+                default:
+                    throw Error(`EditorType not implemented: ${type}`)
+            }
+        }
+
+        async function saveState(){
+            // Construct data and save it to localStorage
+            const handleFirstSave = () => {
+                localStorage.setItem("spe-pages", JSON.stringify([]));
+                saveState();
+                return;
+            }
+            let existingPages;
+            try { existingPages = JSON.parse(localStorage.getItem("spe-pages")); }
+            catch (error) { handleFirstSave(); return;}
+            if (existingPages === undefined || existingPages === null) {handleFirstSave(); return;}
+            const id = existingPages.length.toString();
+            const datetime = Date.now();
+            existingPages.push(
+                {id:id, ts:datetime})
+                ;;
+            const totalData = {};
+            totalData["createdOn"] = new Date(datetime).toISOString();
+            totalData["pageData"] = lstPageElements.map(async (el, index) => {
+                data = await el.serialize();
+                return [index, data];
+            });
+            totalData["pageData"] = await Promise.all(
+                totalData["pageData"].map((val, index) => (
+                    val.then((res) => {
+                        return [index, res]
+                    }).catch((reason)=>{
+                        console.error(`Error while waiting on promise at index ${index}`);
+                    })
+                ))
+            )
+            
+            localStorage.setItem(id, JSON.stringify(totalData));
+            localStorage.setItem("spe-pages", JSON.stringify(existingPages));
+        }
+
+        function loadState(){
+            let existingPages;
+            try{ existingPages = JSON.parse( localStorage.getItem("spe-pages") ); }
+            catch(e){
+                throw Error("There is no data in the localStorage");
+            }
+            const page = existingPages[existingPages.length - 1].id;
+            const data = JSON.parse(localStorage.getItem(page)).pageData;
+            const max = data.length;
+            for(let i = 0; i < max; i++){
+                let obj = data[i][1];
+                try{addNewEditorElement(obj[1].type, obj[1]);} catch(e){
+                    console.error(`Failed loading Object: ${JSON.stringify(obj)}`);
+                    console.error(e);
+                }
+            }
         }
     </script>
 </html>
