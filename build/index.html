@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style type="text/css">
+            </style>
+    </head>
+    <body>
+        <div class="editorCalculator">
+            <!--
+            Wird die Textklasse zum Anzeigen benutzen
+            Zum Editieren:
+                Variablen mussen definiert werden (oben)
+                Variablen beginnen immer mit einem Buchstaben
+                
+                pro Zeile eine Rechnung
+                eine Rechnung besteht immer aus 
+                    rechenweg=variable
+                oder
+                    rechenweg
+                im ersten Fall fuellt die Rechnung die Variable
+                im zweiten Fall wird das Ergebniss unten angezeigt. Danach wird keine Rechnung mehr evaluiert
+            -->
+        </div>
+        <button id="pageEnd" onclick="addNewEditorElement(EditorType.TEXT)">+ Text</button>
+        <button onclick="addNewEditorElement(EditorType.PICTURE)">+ Picture</button>
+        <button onclick="addNewEditorElement(EditorType.ACTION)">+ Action</button><br>
+        <button onclick="saveState()">Save in Browser</button>
+        <button onclick="loadState()">Load from Browser</button>
+    </body>
+    <script type="text/javascript">
+        const EditorType = Object.freeze({
+            TEXT:0,
+            PICTURE:1,
+            ACTION:2,
+            // FIVEWHY:3,
+            // FISHBONE:4,
+            // SWOT:5,
+            // DATE_CREATE:6,
+            // CALCULATOR:7,
+            // VOTE:8,
+        })
+
+        
+        function 
+
+    </script>
+</html>

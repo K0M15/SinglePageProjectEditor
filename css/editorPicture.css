@@ -1,0 +1,24 @@
+.editorPicture {
+	text-align: center;
+}
+.editorPicture.editMode>.edit{
+	display: block;
+	margin:1rem 0 1rem 0;
+}
+.editorPicture>img { 
+	display: inline-block;
+	max-width: 100%;
+}
+.editorPicture>.edit{
+	display: none;
+}
+.editorPicture.editMode>img { display: none; }
+.editorPicture {
+	width:100%;
+	align-items: center;
+	margin: 1rem auto 0 auto;
+	background-color: blue;
+	border: 5px black;
+	border-radius: 3px;
+	border-style: ridge;
+}

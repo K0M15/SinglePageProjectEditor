@@ -1,0 +1,15 @@
+.editorAction table {
+	width:100%;
+}
+.editorAction td {
+	text-align: left;
+}
+.editorAction button:not(.new) {
+	all:unset;
+	color:blue;
+	cursor:pointer;
+	text-decoration: underline;
+}
+.editorActionLastRow {
+	text-align: right;
+}

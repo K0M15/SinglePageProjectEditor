@@ -1,0 +1,20 @@
+{
+	"name": "Node + TypeScript Dev Container",
+	"build": {
+	  "dockerfile": "../Dockerfile"
+	},
+	"settings": {
+	  "terminal.integrated.shell.linux": "/bin/bash"
+	},
+	"extensions": [
+	  "dbaeumer.vscode-eslint",
+	  "esbenp.prettier-vscode",
+	  "ms-vscode.vscode-typescript-tslint-plugin"
+	],
+	"postCreateCommand": "npm install",
+	"forwardPorts": [3000], // Adjust for your app
+	"mounts": [
+	  "source=${localWorkspaceFolder}/node_modules,target=/app/node_modules,type=volume"
+	]
+  }
+  

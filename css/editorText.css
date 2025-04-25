@@ -1,0 +1,14 @@
+.editorText {
+	width:100%;
+	align-items: center;
+	margin: 1rem auto 0 auto;
+	background-color: blue;
+	border: 5px black;
+	border-radius: 3px;
+	border-style: ridge;
+}
+.editorText .elem-btn-cont {position: absolute; left:10px; display: none;}
+.editorText textarea { width:100%; height: calc(10ch); display: none;}
+.editorText.editMode textarea{ display: block !important; }
+.editorText.editMode .displayText { display: none;}
+.editorText.editMode .elem-btn-cont {display: block;}
