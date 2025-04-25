@@ -4,6 +4,8 @@ export interface EditorElementDescription{
 	description:string;
 }
 
+export interface SerializedElementDescription extends Partial<EditorElementDescription>{}
+
 export class EditorElement{
 	editorElementId;
 	type;

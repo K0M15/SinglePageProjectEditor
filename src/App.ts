@@ -1,5 +1,5 @@
 import {builtinPanels} from "./builtinPanels";
-import {EditorElementDescription, EditorElement} from "./builtinPanels";
+import {EditorElementDescription, EditorElement, SerializedElementDescription} from "./builtinPanels";
 import { generateId } from "./id_generator";
 
 interface AppState{
@@ -8,20 +8,22 @@ interface AppState{
 
 interface SerializedPanelState{
 	panelType:string,
-	panelId:string,
-	panelData:any,
+	id:string,
+	data:string,
 }
 
 interface SerializedAppStateDescriptor{
 	id:string;
 	name?:string;
 	ts:number;
+	panels:SerializedElementDescription;
 }
+
 
 interface SerializedAppState{
 	createdOn:string;
 	lastModification:string;
-	pageData:any[];
+	pageData:SerializedPanelState[];
 }
 
 class StateHandler{
@@ -72,14 +74,25 @@ class StateHandler{
 		
 	}
 
-	async loadState(stateId:string){
+	async loadState(stateId:string, availablePanels:EditorElementDescription[]){
+		//check if even available or error
+		const newState = this.availableStates.find(st => st.id == stateId);
+		if (newState === undefined)
+			throw Error(`State with ID ${stateId} not available in localStorage`);
+		this.openedState = newState;
+		this.openedState
 		const storageData = localStorage.getItem(stateId);
 		if (storageData === null)
 			throw Error(`Data for StateId ${stateId} was not available in localStorage`);
-		const data = JSON.parse(storageData).pageData;
+		const data = (JSON.parse(storageData) as SerializedAppState).pageData;
 		const max = data.length;
 		for(let i = 0; i < max; i++){
-			let obj = data[i][1];
+			let pan = availablePanels.find(el => el.name == data[i].panelType);
+			if (pan === undefined)
+				throw Error(`Type ${data[i].panelType} not found in available panels. Maybe extension not loaded?`);
+			const element = new pan.cls(data[i].id);
+			Object.assign(element, JSON.parse(data[i].data));
+			this.state.pageElements.push(element);
 		}
 	}
 	async saveState(){
@@ -153,6 +166,11 @@ export class App{
 		if (element === undefined)
 			throw Error(`Type ${object.panelType} not found in available panels. Maybe extension not loaded?`);
 		this.stateHandler.addPanel(new element.cls(object.panelId));
+	}
+
+	loadExistingState(){
+		//Show overlay and select version
+		//
 	}
 
 	generateStaticSite(){
