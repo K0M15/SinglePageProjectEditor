@@ -15,8 +15,7 @@ export class EditorElement{
 		console.error("Should be implemented by Class");
 	}
 	delete (){
-		let idx = lstPageElements.findIndex( el => el === this);
-		lstPageElements.splice(idx, 1);
+		// Nothing to do...
 	}
 }
 

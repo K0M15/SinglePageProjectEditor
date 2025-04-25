@@ -1,9 +1,15 @@
 import {builtinPanels} from "./builtinPanels";
-import type {EditorElementDescription, EditorElement} from "./builtinPanels";
+import {EditorElementDescription, EditorElement} from "./builtinPanels";
 import { generateId } from "./id_generator";
 
 interface AppState{
 	pageElements:EditorElement[];
+}
+
+interface SerializedPanelState{
+	panelType:string,
+	panelId:string,
+	panelData:any,
 }
 
 interface SerializedAppStateDescriptor{
@@ -66,17 +72,14 @@ class StateHandler{
 		
 	}
 
-	async loadState(){
-		let existingPages;
-		const page = existingPages[existingPages.length - 1].id;
-		const data = JSON.parse(localStorage.getItem(page)).pageData;
+	async loadState(stateId:string){
+		const storageData = localStorage.getItem(stateId);
+		if (storageData === null)
+			throw Error(`Data for StateId ${stateId} was not available in localStorage`);
+		const data = JSON.parse(storageData).pageData;
 		const max = data.length;
 		for(let i = 0; i < max; i++){
 			let obj = data[i][1];
-			try{addNewEditorElement(obj[1].type, obj[1]);} catch(e){
-				console.error(`Failed loading Object: ${JSON.stringify(obj)}`);
-				console.error(e);
-			}
 		}
 	}
 	async saveState(){
@@ -116,7 +119,7 @@ export class App{
 	setupPage(){
 		const body = document.body;
 		//	PANEL BUTTONS
-		for (let panel of this.availablePanels)
+		for (const panel of this.availablePanels)
 		{
 			let button = document.createElement("button");
 			button.innerText = panel.name;
@@ -127,6 +130,7 @@ export class App{
 			button.onmouseover = null; //todo: onhover -> display panel.description next to mouse :)
 			body.appendChild(button);
 		}
+		body.firstElementChild?.classList.add("pageEnd");
 		body.appendChild(document.createElement("br"));
 		//	LOAD AND SAVE BUTTONS
 		let btnSaveLoc = document.createElement("button");
@@ -144,9 +148,14 @@ export class App{
 		this.stateHandler.addPanel(new element.cls(generateId()));
 	}
 
-	loadEditorElement(cls:new (...args:any[]) => EditorElement, object:any){
-		
+	loadEditorElement(object:SerializedPanelState){
+		const element = this.availablePanels.find( av => av.name == object.panelType);
+		if (element === undefined)
+			throw Error(`Type ${object.panelType} not found in available panels. Maybe extension not loaded?`);
+		this.stateHandler.addPanel(new element.cls(object.panelId));
 	}
 
-	generateStaticSite(){}
+	generateStaticSite(){
+		throw Error("NOT IMPLEMENTED App.generateStaticSite");
+	}
 }
