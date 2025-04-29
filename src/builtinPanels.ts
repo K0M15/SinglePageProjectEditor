@@ -1,3 +1,11 @@
+import { SerializedPanelState } from "./App";
+
+enum EditorType{
+	TEXT,
+	PICTURE,
+	ACTION,
+}
+
 export interface EditorElementDescription{
 	cls:new (...args:any[]) => EditorElement;
 	name:string;
@@ -7,9 +15,9 @@ export interface EditorElementDescription{
 export interface SerializedElementDescription extends Partial<EditorElementDescription>{}
 
 export class EditorElement{
-	editorElementId;
-	type;
-	constructor(editorElementId, type){
+	editorElementId:string;
+	type:string;
+	constructor(editorElementId:string, type:string){
 		this.editorElementId = editorElementId;
 		this.type = type;
 	}
@@ -19,6 +27,13 @@ export class EditorElement{
 	delete (){
 		// Nothing to do...
 	}
+	async serialize():Promise<SerializedPanelState>{
+		throw Error("Object serialization should be implemented by child class");
+	}
+
+	static fromDataObject(obj:SerializedPanelState):EditorElement{
+		throw Error("Object serialization should be implemented by child class");
+	}
 }
 
 class EditorText extends EditorElement{
@@ -26,8 +41,8 @@ class EditorText extends EditorElement{
 	displayElement;
 	textareaElement;
 	buttonContainer;
-	constructor(editorElementId) {
-		super(editorElementId, EditorType.TEXT);
+	constructor(editorElementId:string) {
+		super(editorElementId, "TEXT");
 		this.pageElement = document.createElement("div");
 		this.pageElement.classList.add("editorText");
 		// Delete Button
@@ -70,7 +85,7 @@ class EditorText extends EditorElement{
 		this.displayElement.innerHTML = this.replaceMD(data);
 	}
 
-	replaceMD(markdown)
+	replaceMD(markdown:string)
 	{
 		
 		// Escape HTML
@@ -125,18 +140,18 @@ class EditorText extends EditorElement{
 	
 	async serialize(){
 		return {
-			type:this.type,
-			text:this.textareaElement.value,
-			editorElementId:this.editorElementId,
+			panelType:this.type,
+			data:this.textareaElement.value,
+			id:this.editorElementId,
 		};
 	}
 
-	static fromDataObj(obj){
-		if (obj.editorElementId === undefined || obj.text === undefined){
+	static fromDataObj(obj:SerializedPanelState){
+		if (obj.id === undefined || obj.data === undefined){
 			throw Error("obj corrupted");
 		}
-		const res = new EditorText(obj.editorElementId);
-		res.textareaElement.value = obj.text;
+		const res = new EditorText(obj.id);
+		res.textareaElement.value = obj.data;
 		res.render();
 		return res;
 	}
@@ -148,9 +163,8 @@ class EditorPicture extends EditorElement{
 	editorElement;
 	fileSelectorElement;
 	linkSelectorElement;
-	imageData;
-	constructor(editorElementId){
-		super(editorElementId, EditorType.PICTURE);
+	constructor(editorElementId:string){
+		super(editorElementId, "PICTURE");
 		this.pageElement = document.createElement("div");
 		this.pageElement.classList.add("editorPicture", "editMode");
 		this.imageElement = document.createElement("img");
@@ -167,7 +181,7 @@ class EditorPicture extends EditorElement{
 		this.fileSelectorElement.type = "file";
 		this.fileSelectorElement.accept = "image/*,.svg";
 		this.fileSelectorElement.hidden = true;
-		lbl_file.classList.add = "file-button";
+		lbl_file.classList.add("file-button");
 		lbl_file.appendChild(btn_file);
 		lbl_file.appendChild(this.fileSelectorElement);
 		this.linkSelectorElement = document.createElement("input");
@@ -196,12 +210,17 @@ class EditorPicture extends EditorElement{
 			this.pageElement.classList.remove("editMode");
 			if (this.linkSelectorElement.value)
 				this.imageElement.src = this.linkSelectorElement.value;
-			else if (this.fileSelectorElement.value){
+			else if (this.fileSelectorElement.value && this.fileSelectorElement.files != null){
 				const file = this.fileSelectorElement.files[0];
 				if (!file) return;
 
 				const reader = new FileReader();
-				reader.onload = (e) => { this.imageElement.src = e.target.result; };
+				reader.onload = (e) => {
+					if (e.target != null
+						&& e.target.result != null 
+						&& typeof e.target.result == "string")
+					this.imageElement.src = e.target.result; 
+				};
 				reader.readAsDataURL(file);
 			}
 		}
@@ -231,24 +250,26 @@ class EditorPicture extends EditorElement{
 	
 	async serialize(){
 		return {
-			editorElementId:this.editorElementId,
-			type:this.type,
-			src:await this.saveLoadedImageData(),
+			id:this.editorElementId,
+			panelType:this.type,
+			data:await this.saveLoadedImageData(),
 		};
 	}
 
-	static fromDataObj(obj){
-		if (obj.editorElementId === undefined || obj.src === undefined){
+	static fromDataObj(obj:SerializedPanelState){
+		if (obj.id === undefined || obj.data === undefined){
 			throw Error("obj corrupted");
 		}
-		const res = new EditorPicture(obj.editorElementId);
+		const res = new EditorPicture(obj.id);
 		caches.open("spe-images").then((cache) => 
-			cache.match(obj.src).then((resp) =>
+			cache.match(obj.data).then((resp) => {
+				if (resp === undefined)
+					throw Error(`No match for ${obj.data} in cache "spe-images". Corrupted data?`);
 				resp.blob().then((blob) => {
 					res.imageElement.src = URL.createObjectURL(blob);
 					res.linkSelectorElement.value = res.imageElement.src;
 				})
-			)
+			})
 		)
 		// res.imageElement.src = obj.src;
 		// res.imageElement.linkSelectorElement.value = obj.src;
@@ -257,11 +278,15 @@ class EditorPicture extends EditorElement{
 	}
 }
 
+type EditorActionCell = string | number | boolean | null;
+type EditorActionCol = Array<EditorActionCell>;
+type EditorActionGrid = Array<EditorActionCol>;
+
 class EditorAction extends EditorElement{
-	pageElement;
-	data;
-	constructor(editorElementId){
-		super(editorElementId, EditorType.ACTION);
+	pageElement:HTMLDivElement;
+	data:EditorActionGrid;
+	constructor(editorElementId:string){
+		super(editorElementId, "ACTION");
 		this.data = [
 			["", "Description", "Responsible", "Date"]
 		]
@@ -279,7 +304,7 @@ class EditorAction extends EditorElement{
 		let header = document.createElement("tr");
 		header.append(...this.data[0].map((e)=>{
 			let el = document.createElement("th");
-			el.innerText = e;
+			el.innerText = e as string;
 			return el;
 		}));
 		result.appendChild(header);
@@ -308,7 +333,7 @@ class EditorAction extends EditorElement{
 		this.render();
 	}
 
-	handleFieldData(data, row, col){
+	handleFieldData(data:EditorActionCell, row:number, col:number){
 		let result = document.createElement("td");
 		const add_edit_handler = () =>{
 			result.ondblclick = () => {
@@ -329,17 +354,19 @@ class EditorAction extends EditorElement{
 				console.log(check.checked);
 				this.data[row][col] = check.checked;
 			}
-			check.checked = data;
+			if (typeof data == "boolean")
+				check.checked = data;
+			else 
+				check.checked = false;
 			result.appendChild(check);
 		}
-		else if(!isNaN(Date.parse(data))){
-			result.innerText = data.toLocaleDateString();
+		else if(typeof data == "string" && !isNaN(Date.parse(data))){
+			result.innerText = Date.parse(data).toLocaleString();
 			add_edit_handler();
 		}
 		else if (
-			(typeof data === "string" || data instanceof String)
-			&& data != ""
-			){
+			(typeof data === "string")
+			&& data != ""){
 			result.innerText = data;
 			add_edit_handler();
 		}   
@@ -357,18 +384,18 @@ class EditorAction extends EditorElement{
 
 	async serialize(){
 		return {
-			type:this.type,
-			editorElementId:this.editorElementId,
-			data:this.data
+			panelType:this.type,
+			id:this.editorElementId,
+			data:JSON.stringify(this.data)
 		};
 	}
 
-	static fromDataObj(obj){
-		if (obj.editorElementId === undefined || obj.data === undefined){
+	static fromDataObj(obj:SerializedPanelState){
+		if (obj.id === undefined || obj.data === undefined){
 			throw Error("obj corrupted");
 		}
-		const res = new EditorAction(obj.editorElementId);
-		res.data = obj.data;
+		const res = new EditorAction(obj.id);
+		res.data = JSON.parse(obj.data);
 		res.render();
 		return res;
 	}

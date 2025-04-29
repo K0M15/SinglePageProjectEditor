@@ -2,11 +2,19 @@ import {builtinPanels} from "./builtinPanels";
 import {EditorElementDescription, EditorElement, SerializedElementDescription} from "./builtinPanels";
 import { generateId } from "./id_generator";
 
-interface AppState{
+class AppState{
 	pageElements:EditorElement[];
+	
+	constructor (){
+		this.pageElements = [];
+	}
+
+	async serialize(){
+		return (await Promise.all(this.pageElements.map(el => el.serialize())));
+	}
 }
 
-interface SerializedPanelState{
+export interface SerializedPanelState{
 	panelType:string,
 	id:string,
 	data:string,
@@ -32,12 +40,13 @@ class StateHandler{
 	availableStates:SerializedAppStateDescriptor[];
 
 	constructor(){
-		this.state = { pageElements:[] as EditorElement[] };
+		this.state = new AppState();
 		this.openedState = {
 			id:generateId(),
 			name:undefined,
 			ts:Date.now()
 		};
+		this.availableStates = [];
 		this.loadAvailableStates();
 	}
 
@@ -46,10 +55,9 @@ class StateHandler{
 			const available = localStorage.getItem("spe-pages");
 			if (available === null)
 				return false;
-			this.availableStates = JSON.parse(available);
+			this.availableStates.push(...JSON.parse(available) as SerializedAppStateDescriptor[]);
 		}
 		catch(e){
-			this.availableStates = [];
 			this.saveAvailableStates();
 		}
 	}
@@ -97,25 +105,12 @@ class StateHandler{
 	}
 	async saveState(){
 		// First find state, then save, if not exist create new
-		existingPages.push({id:id, ts:datetime});
-		const totalData = {};
-		totalData["createdOn"] = new Date(datetime).toISOString();
-		totalData["pageData"] = lstPageElements.map(async (el, index) => {
-			data = await el.serialize();
-			return [index, data];
-		});
-		totalData["pageData"] = await Promise.all(
-			totalData["pageData"].map((val, index) => (
-				val.then((res) => {
-					return [index, res]
-				}).catch((reason)=>{
-					console.error(`Error while waiting on promise at index ${index}`);
-				})
-			))
-		)
-		
-		localStorage.setItem(id, JSON.stringify(totalData));
-		localStorage.setItem("spe-pages", JSON.stringify(existingPages));
+		this.saveAvailableStates();
+		this.state.serialize().then((data) =>{
+			if (this.openedState.id === undefined)
+				this.openedState.id = generateId();
+			localStorage.setItem(this.openedState.id, JSON.stringify(data));
+		})
 	}
 
 }
@@ -127,6 +122,7 @@ export class App{
 		this.availablePanels = [];
 		this.availablePanels.push(...builtinPanels);
 		this.stateHandler = new StateHandler();
+		this.setupPage();
 	}
 
 	setupPage(){
@@ -165,7 +161,7 @@ export class App{
 		const element = this.availablePanels.find( av => av.name == object.panelType);
 		if (element === undefined)
 			throw Error(`Type ${object.panelType} not found in available panels. Maybe extension not loaded?`);
-		this.stateHandler.addPanel(new element.cls(object.panelId));
+		this.stateHandler.addPanel(new element.cls(object.id));
 	}
 
 	loadExistingState(){

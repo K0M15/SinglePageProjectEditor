@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+      "target": "ES2018",               // JS version
+      "module": "ESNext",               // Use ES modules for browser compatibility
+      "lib": ["ES2018", "DOM"],         // Include DOM APIs like `document`, `localStorage`, etc.
+      "sourceMap": true,                // Enable source maps for debugging
+      "outDir": "build",                // Output directory
+      "moduleResolution": "node",      // Required for module imports
+      "strict": true,                  // Optional, for strict type-checking
+      "esModuleInterop": true,          // Optional, smoother interop with CommonJS,
+    },
+    "include": ["src/**/*"]
+  }
+  
