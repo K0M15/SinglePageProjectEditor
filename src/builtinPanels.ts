@@ -8,6 +8,7 @@ enum EditorType{
 
 export interface EditorElementDescription{
 	cls:new (...args:any[]) => EditorElement;
+	fromObject:(obj:SerializedPanelState) => EditorElement;
 	name:string;
 	description:string;
 }
@@ -31,7 +32,7 @@ export class EditorElement{
 		throw Error("Object serialization should be implemented by child class");
 	}
 
-	static fromDataObject(obj:SerializedPanelState):EditorElement{
+	static fromDataObj(obj:SerializedPanelState):EditorElement{
 		throw Error("Object serialization should be implemented by child class");
 	}
 }
@@ -42,7 +43,7 @@ class EditorText extends EditorElement{
 	textareaElement;
 	buttonContainer;
 	constructor(editorElementId:string) {
-		super(editorElementId, "TEXT");
+		super(editorElementId, "Text");
 		this.pageElement = document.createElement("div");
 		this.pageElement.classList.add("editorText");
 		// Delete Button
@@ -164,7 +165,7 @@ class EditorPicture extends EditorElement{
 	fileSelectorElement;
 	linkSelectorElement;
 	constructor(editorElementId:string){
-		super(editorElementId, "PICTURE");
+		super(editorElementId, "Picture");
 		this.pageElement = document.createElement("div");
 		this.pageElement.classList.add("editorPicture", "editMode");
 		this.imageElement = document.createElement("img");
@@ -286,7 +287,7 @@ class EditorAction extends EditorElement{
 	pageElement:HTMLDivElement;
 	data:EditorActionGrid;
 	constructor(editorElementId:string){
-		super(editorElementId, "ACTION");
+		super(editorElementId, "Action");
 		this.data = [
 			["", "Description", "Responsible", "Date"]
 		]
@@ -404,16 +405,19 @@ class EditorAction extends EditorElement{
 export const builtinPanels:EditorElementDescription[] = [
 	{
 		cls:EditorText,
+		fromObject:EditorText.fromDataObj,
 		name:"Text",
 		description:"A Markdown-Formated textfield"
 	},
 	{
 		cls:EditorPicture,
+		fromObject:EditorPicture.fromDataObj,
 		name:"Picture",
 		description:"A Picture from a link or from a file"
 	},
 	{
 		cls:EditorAction,
+		fromObject:EditorAction.fromDataObj,
 		name:"Action",
 		description:"An Element oranizing actions"
 	}

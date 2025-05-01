@@ -12,6 +12,10 @@ class AppState{
 	async serialize(){
 		return (await Promise.all(this.pageElements.map(el => el.serialize())));
 	}
+
+	push(...args:EditorElement[]){
+		this.pageElements.push(...args);
+	}
 }
 
 export interface SerializedPanelState{
@@ -24,7 +28,7 @@ interface SerializedAppStateDescriptor{
 	id:string;
 	name?:string;
 	ts:number;
-	panels:SerializedElementDescription;
+	panels:string[];
 }
 
 
@@ -63,23 +67,55 @@ class StateHandler{
 	}
 
 	saveAvailableStates(){
+		if (this.openedState.id === undefined)
+			this.openedState.id = generateId();
+		if (this.openedState.panels === undefined)
+			this.openedState.panels = builtinPanels.map(e => e.name);
+		if (this.openedState.ts === undefined)
+			this.openedState.ts = Date.now();
+		const existingIndex = this.availableStates.findIndex( elem => elem.id == this.openedState.id);
+		if (existingIndex == -1)
+			this.availableStates.push(this.openedState as SerializedAppStateDescriptor);
+		else
+			Object.assign(this.availableStates[existingIndex], this.openedState);
 		localStorage.setItem("spe-pages", JSON.stringify(this.availableStates));
 	}
 
 	addPanel(element:EditorElement){
-		this.state.pageElements.push(element);
+		this.state.push(element);
 	}
 
 	removePanel(elementId:string){
-		const elementIndex = this.state.pageElements.findIndex(el => el.editorElementId === elementId)
+		const elementIndex = this.state.pageElements
+			.findIndex(el => el.editorElementId === elementId);
 		if (elementIndex == -1)
 			throw Error(`Element with ID ${elementId} does not exist`);
 		this.state.pageElements[elementIndex].delete();
 		this.state.pageElements.splice(elementIndex, 1);
 	}
 
-	selectAvailableState(){
-		
+	selectAvailableState(app:App){
+		const modal = document.createElement("div");
+		modal.classList.add("modal");
+		app.showOverlay(modal);
+		const table = document.createElement("table");
+		table.classList.add("border");
+		this.availableStates.map((elem) =>{
+			const row = document.createElement("tr");
+			const descriptor = document.createElement("td");
+			descriptor.innerText = (elem.name != undefined 
+				&& elem.name != null)?elem.name:elem.id;
+			const time = document.createElement("td");
+			time.innerText = new Date(elem.ts).toLocaleDateString();
+			row.appendChild(descriptor);
+			row.appendChild(time);
+			row.onclick = () =>{
+				this.loadState(elem.id, app.availablePanels)
+					.then(() => { app.overlayClose(); })
+			};
+			table.appendChild(row);
+		});
+		modal.appendChild(table);
 	}
 
 	async loadState(stateId:string, availablePanels:EditorElementDescription[]){
@@ -92,24 +128,24 @@ class StateHandler{
 		const storageData = localStorage.getItem(stateId);
 		if (storageData === null)
 			throw Error(`Data for StateId ${stateId} was not available in localStorage`);
-		const data = (JSON.parse(storageData) as SerializedAppState).pageData;
+		const data = (JSON.parse(storageData) as SerializedPanelState[]);
 		const max = data.length;
 		for(let i = 0; i < max; i++){
 			let pan = availablePanels.find(el => el.name == data[i].panelType);
 			if (pan === undefined)
 				throw Error(`Type ${data[i].panelType} not found in available panels. Maybe extension not loaded?`);
-			const element = new pan.cls(data[i].id);
-			Object.assign(element, JSON.parse(data[i].data));
+			const element = pan.fromObject(data[i]);
 			this.state.pageElements.push(element);
 		}
 	}
+
 	async saveState(){
 		// First find state, then save, if not exist create new
+		if (this.openedState.id === undefined)
+			this.openedState.id = generateId();
 		this.saveAvailableStates();
 		this.state.serialize().then((data) =>{
-			if (this.openedState.id === undefined)
-				this.openedState.id = generateId();
-			localStorage.setItem(this.openedState.id, JSON.stringify(data));
+			localStorage.setItem(this.openedState.id as string, JSON.stringify(data));
 		})
 	}
 
@@ -126,6 +162,7 @@ export class App{
 	}
 
 	setupPage(){
+		document.title = "SingePageEditor"
 		const body = document.body;
 		//	PANEL BUTTONS
 		for (const panel of this.availablePanels)
@@ -134,7 +171,7 @@ export class App{
 			button.innerText = panel.name;
 			button.classList.add("btn-add-panel");
 			button.onclick = () => {
-				this.stateHandler.addPanel(new panel.cls(generateId))
+				this.stateHandler.addPanel(new panel.cls(generateId()))
 			}
 			button.onmouseover = null; //todo: onhover -> display panel.description next to mouse :)
 			body.appendChild(button);
@@ -144,10 +181,21 @@ export class App{
 		//	LOAD AND SAVE BUTTONS
 		let btnSaveLoc = document.createElement("button");
 		btnSaveLoc.innerText = "Save (Browser)";
-		btnSaveLoc.onclick = this.stateHandler.saveState;
+		btnSaveLoc.onclick = () => {
+			this.stateHandler.saveState();
+		}
+		body.appendChild(btnSaveLoc);
 		let btnLoadLoc = document.createElement("button");
 		btnLoadLoc.innerText = "Load (Browser)";
-		btnLoadLoc.onclick = this.stateHandler.selectAvailableState;
+		btnLoadLoc.onclick = ()=>{
+			this.stateHandler.selectAvailableState(this);
+		}
+		body.appendChild(btnLoadLoc);
+		//Overlay
+		const overlay = document.createElement("div");
+		overlay.id = "overlay";
+		overlay.classList.add("overlay", "hidden");
+		body.appendChild(overlay);
 	}
 
 	addNewEditorElement(type:string){
@@ -165,8 +213,24 @@ export class App{
 	}
 
 	loadExistingState(){
-		//Show overlay and select version
-		//
+	}
+
+	showOverlay(modal:HTMLDivElement){
+		const overlayElem = document.getElementById("overlay")
+		if (overlayElem == null)
+			throw Error("Overlay element not found");
+		overlayElem.appendChild(modal);
+		overlayElem.classList.remove("hidden");
+		// add onlclick outside this.overlayClose()
+	}
+
+	overlayClose()
+	{
+		const overlayElem = document.getElementById("overlay")
+		if (overlayElem == null)
+			throw Error("Overlay element not found");
+		overlayElem.classList.add("hidden");
+		overlayElem.innerHTML = "";
 	}
 
 	generateStaticSite(){
