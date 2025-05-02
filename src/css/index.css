@@ -51,6 +51,12 @@ body {
 .hidden {
     display: none;
 }
+.close_overlay_button { 
+	color: #ccc;
+	top: 10px;
+	right: 10px;
+	position: absolute;
+}
 
 table .border{
 	border: #333 2px solid;

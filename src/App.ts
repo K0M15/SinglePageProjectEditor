@@ -139,14 +139,32 @@ class StateHandler{
 		}
 	}
 
-	async saveState(){
+	async saveState(app:App){
 		// First find state, then save, if not exist create new
 		if (this.openedState.id === undefined)
 			this.openedState.id = generateId();
-		this.saveAvailableStates();
-		this.state.serialize().then((data) =>{
-			localStorage.setItem(this.openedState.id as string, JSON.stringify(data));
-		})
+		const modal = document.createElement("div");
+		modal.classList.add("modal");
+		const input = document.createElement("input");
+		input.type = "text";
+		const button = document.createElement("button");
+		button.innerText = "Save";
+		button.onclick = () => {
+			const newName = input.value;
+			if (newName === undefined || newName === "")
+				throw Error("Input a name")
+			else if( this.availableStates.find(el => el.name === newName))
+				throw Error("Name is already in available states");
+			this.openedState.name = newName;
+			this.saveAvailableStates();
+			this.state.serialize().then((data) =>{
+				localStorage.setItem(this.openedState.id as string, JSON.stringify(data));
+			})
+			app.overlayClose();
+		}
+		modal.appendChild(input);
+		modal.appendChild(button);
+		app.showOverlay(modal);
 	}
 
 }
@@ -154,6 +172,8 @@ class StateHandler{
 export class App{
 	stateHandler:StateHandler;
 	availablePanels:EditorElementDescription[];
+	private overlayEventBuffer?:((this:GlobalEventHandlers, event:KeyboardEvent) => void) | null;
+
 	constructor(){
 		this.availablePanels = [];
 		this.availablePanels.push(...builtinPanels);
@@ -182,7 +202,7 @@ export class App{
 		let btnSaveLoc = document.createElement("button");
 		btnSaveLoc.innerText = "Save (Browser)";
 		btnSaveLoc.onclick = () => {
-			this.stateHandler.saveState();
+			this.stateHandler.saveState(this);
 		}
 		body.appendChild(btnSaveLoc);
 		let btnLoadLoc = document.createElement("button");
@@ -195,6 +215,13 @@ export class App{
 		const overlay = document.createElement("div");
 		overlay.id = "overlay";
 		overlay.classList.add("overlay", "hidden");
+		const overlay_close_btn = document.createElement("div");
+		overlay_close_btn.classList.add("close_overlay_button");
+		overlay_close_btn.innerHTML = "X";
+		overlay_close_btn.onclick = () => {
+			this.overlayClose();
+		}
+		overlay.appendChild(overlay_close_btn);
 		body.appendChild(overlay);
 	}
 
@@ -221,6 +248,11 @@ export class App{
 			throw Error("Overlay element not found");
 		overlayElem.appendChild(modal);
 		overlayElem.classList.remove("hidden");
+		this.overlayEventBuffer = document.onkeydown;
+		document.onkeydown = (event) => {
+			if (event.key == "Escape")
+				this.overlayClose();
+		}
 		// add onlclick outside this.overlayClose()
 	}
 
@@ -230,7 +262,14 @@ export class App{
 		if (overlayElem == null)
 			throw Error("Overlay element not found");
 		overlayElem.classList.add("hidden");
+		const closebtn = overlayElem.firstChild
 		overlayElem.innerHTML = "";
+		if (closebtn != null)
+			overlayElem.appendChild(closebtn);
+		if (this.overlayEventBuffer === null || this.overlayEventBuffer === undefined)
+			document.onkeydown = null;
+		else
+			document.onkeydown = this.overlayEventBuffer;
 	}
 
 	generateStaticSite(){

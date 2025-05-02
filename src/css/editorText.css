@@ -3,6 +3,7 @@
 	align-items: center;
 	margin: 1rem auto 0 auto;
 	background-color: #eee;
+	min-height: 5rem;
 }
 .editorText .elem-btn-cont {position: absolute; left:10px; display: none;}
 .editorText textarea { width:100%; height: calc(10ch); display: none;}
