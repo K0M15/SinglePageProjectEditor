@@ -4,4 +4,5 @@ import "./css/editorText.css";
 import "./css/editorPicture.css";
 import "./css/editorActions.css";
 
-const app = new App();
+const app = new App(false);
+(window as any).App = app;

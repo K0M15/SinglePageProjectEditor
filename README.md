@@ -18,7 +18,8 @@ This project is in the early stages of development.
 ## Currently Working
 - Text with Basic Markdown https://www.markdownguide.org/cheat-sheet/
 - Pictures
-- Saving & Loading using localStorage
+- Saving & Loading using localStorage and some server (*not included*)
+- Actions
 
 ## Still to create
 - Delete Button to Pictures
@@ -34,7 +35,7 @@ This project is in the early stages of development.
     - Sortable
     - Moveable Columns
     - DateSelector
-- Dates
+- Dates / Planer
 - Tables
 - A calculator
 - A Help Overlay
@@ -42,7 +43,7 @@ This project is in the early stages of development.
 ### Functionality
  - Save as new page (to keep contents)
  - Presentation-Mode
- - CO-Working and backend
+ - CO-Working
  - Create Plugin System for Elements. Define class better and put some description of the button, the new Element in there
  - Maybe create hooks for site load or something
 
