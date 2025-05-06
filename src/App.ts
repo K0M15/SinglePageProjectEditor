@@ -38,10 +38,17 @@ interface SerializedAppState{
 	pageData:SerializedPanelState[];
 }
 
+interface StateHandlerChangeEvent{
+
+}
+
+
 class StateHandler{
 	state:AppState;
 	openedState:Partial<SerializedAppStateDescriptor>;
 	availableStates:SerializedAppStateDescriptor[];
+	
+	changeListeners:((stateHandler:StateHandler)=>void)[]; // Add state listeners, add 	
 
 	constructor(app:App){
 		this.state = new AppState();
@@ -52,7 +59,19 @@ class StateHandler{
 			panels:[]
 		};
 		this.availableStates = [];
+		this.changeListeners = [] as ((stateHandler:StateHandler)=>void)[];
+		this.changeListeners.push(() => { this.updateTimestamp(); })
 		this.loadAvailableStates(app);
+	}
+
+	triggerChange(){
+		this.changeListeners.forEach((listener) =>{
+			listener(this);
+		})
+	}
+
+	updateTimestamp(){
+		this.openedState.ts = Date.now();
 	}
 
 	loadAvailableStates(app:App){
@@ -82,8 +101,18 @@ class StateHandler{
 					this.preLoadRemote(val.id, app);
 				}
 				else{
-					Object.assign(this.availableStates[idx], val);
-					this.preLoadRemote(val.id, app);
+					if (this.availableStates[idx].ts < val.ts)
+					{
+						Object.assign(this.availableStates[idx], val);
+						this.preLoadRemote(val.id, app);
+					}
+					else
+					{
+						const data = localStorage.getItem(val.id);
+						if (data == null)
+							throw Error(`Local describted project ${val.name ?? val.id} not found`);
+						app.client.saveDocument(val.id, JSON.parse(data) as SerializedPanelState[]);
+					}
 				}
 			})
 		})
@@ -111,6 +140,9 @@ class StateHandler{
 	}
 
 	addPanel(element:EditorElement){
+		element.changeListener.push(() => {
+			this.triggerChange()
+		});
 		this.state.push(element);
 	}
 
@@ -254,12 +286,14 @@ class StateHandler{
 }
 
 export class App{
+	allowedCookies:boolean
 	client:FrontendClient
 	stateHandler:StateHandler;
 	availablePanels:EditorElementDescription[];
 	private overlayEventBuffer?:((this:GlobalEventHandlers, event:KeyboardEvent) => void) | null;
 
 	constructor(isStandalone:boolean){
+		this.allowedCookies = false;
 		this.availablePanels = [];
 		this.availablePanels.push(...builtinPanels);
 		this.stateHandler = new StateHandler(this);
@@ -275,51 +309,75 @@ export class App{
 		}
 	}
 
+	areCookiesAllowed():boolean{
+		const cookiesAccepted = localStorage.getItem("cookiesAccepted");
+		if (cookiesAccepted == null)
+			this.displayCookieQuestion()
+	}
+
+// 	async displayCookieQuestion(){
+// 		this.showOverlay(this.createElement("div", {
+// 			classList:["modal"],
+// 			children:[
+// 				this.createElement("div", {
+// 					innerText: "Do you allow cookies or other data to be saved?\
+//  This page relies a lot on it, and you wont be able to save any data if you dont\
+//  accept.",
+// 				}),
+// 			]
+// 		}))
+// 	}
+
 	setupPage(){
 		document.title = "SingePageEditor"
 		const body = document.body;
 		//	PANEL BUTTONS
 		for (const panel of this.availablePanels)
 		{
-			let button = document.createElement("button");
-			button.innerText = panel.name;
-			button.classList.add("btn-add-panel");
-			button.onclick = () => {
-				this.stateHandler.addPanel(new panel.cls(generateId()))
-			}
-			button.onmouseover = null; // TODO: onhover -> display panel.description next to mouse :)
-			body.appendChild(button);
-		}
-		body.firstElementChild?.classList.add("pageEnd");
-		body.appendChild(document.createElement("br"));
-		//	LOAD AND SAVE BUTTONS
-		let btnSaveLoc = document.createElement("button");
-		btnSaveLoc.innerText = "Save (Browser)";
-		btnSaveLoc.onclick = () => {
-			this.stateHandler.saveState(this);
-		}
-		body.appendChild(btnSaveLoc);
-		let btnLoadLoc = document.createElement("button");
-		btnLoadLoc.innerText = "Load (Browser)";
-		btnLoadLoc.onclick = ()=>{
-			this.stateHandler.selectAvailableState(this, (stateID) => {
-				this.stateHandler.loadState(stateID, this.availablePanels)
-				this.overlayClose();
+			const button = this.createElement("button", {
+				innerText:panel.name,
+				classList:["btn-add-panel"],
+				onClick:() => {
+					this.stateHandler.addPanel(new panel.cls(generateId()))
+				},
+				parent:body
 			});
 		}
-		body.appendChild(btnLoadLoc);
+		body.firstElementChild?.classList.add("pageEnd");
+		this.createElement("br", {parent:body})
+		//	LOAD AND SAVE BUTTONS
+		this.createElement("button", {
+			innerText:"Save",
+			onClick:() => {this.stateHandler.saveState(this);},
+			parent:body
+		});
+		this.createElement("button", {
+			innerText:"Load (Browser",
+			onClick:() => {
+				this.stateHandler.selectAvailableState(this, (stateID) => {
+					this.stateHandler.loadState(stateID, this.availablePanels)
+					this.overlayClose();
+				});
+			},
+			parent:body
+		});
+		this.createElement("button", {
+			innerText:"Login",
+			onClick:() => {
+				this.displayLogin();
+			},
+			parent:body
+		})
 		//Overlay
-		const overlay = document.createElement("div");
-		overlay.id = "overlay";
-		overlay.classList.add("overlay", "hidden");
-		const overlay_close_btn = document.createElement("div");
-		overlay_close_btn.classList.add("close_overlay_button");
-		overlay_close_btn.innerHTML = "X";
-		overlay_close_btn.onclick = () => {
-			this.overlayClose();
-		}
-		overlay.appendChild(overlay_close_btn);
-		body.appendChild(overlay);
+		const overlay = this.createElement("div", {id:"overlay", classList:["overlay", "hidden"], parent:body})
+		this.createElement("button", {
+			parent:overlay,
+			classList:["close_overlay_button"],
+			innerText:"X",
+			onClick:() => {
+				this.overlayClose();
+			}
+		});
 	}
 
 	addNewEditorElement(type:string){
@@ -368,12 +426,14 @@ export class App{
 
 	displayLogin(){
 		const modal = this.createElement("div", {
-			classList: ["modal"],
+			classList: ["modal", "modal-display-login"],
 		});
 		const inputEmail = this.createElement("input", {});
 		inputEmail.type = "text";
+		inputEmail.placeholder = "Email";
 		const inputPassword = this.createElement("input", {});
 		inputPassword.type = "password";
+		inputPassword.placeholder = "Password";
 		const loginButton = this.createElement("button", {
 			innerText:"Login",
 			onClick: () => {
@@ -390,13 +450,21 @@ export class App{
 				})
 			}
 		})
-		modal.append(
-			inputEmail,
-			inputPassword,
-			document.createElement("br"),
-			loginButton,
-			registerButton
-		);
+
+		const formEl = this.createElement("form", {
+			children:[
+				this.createElement("div",{
+					classList:["info-text"],
+					innerHTML:"Currently, registration is not open to the public. If you know me, contact me and get a test account"
+				}),
+				inputEmail,
+				inputPassword,
+				document.createElement("br"),
+				loginButton,
+				registerButton
+			],
+			parent:modal,
+		})
 		this.showOverlay(modal);
 	}
 	
@@ -414,6 +482,8 @@ export class App{
 			id:string,
 			innerText:string,
 			onClick:(this:GlobalEventHandlers, event:MouseEvent) => any,
+			children:Node[],
+			innerHTML:string,
 		}>
 	): HTMLElementTagNameMap[K] {
 		const element = document.createElement(tagname);
@@ -442,8 +512,15 @@ export class App{
 				case "innerText":
 					element.innerText = options.innerText ?? element.innerText;
 					break;
+				case "innerHTML":
+					element.innerHTML = options.innerHTML ?? element.innerHTML;
+					break;
 				case "onClick":
 					element.onclick = options.onClick ?? element.onclick;
+					break;
+				case "children":
+					element.append(...options.children ?? new Array<Node>())
+					break;
 				default:
 					break
 			}

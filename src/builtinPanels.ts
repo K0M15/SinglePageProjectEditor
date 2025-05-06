@@ -18,15 +18,22 @@ export interface SerializedElementDescription extends Partial<EditorElementDescr
 export class EditorElement{
 	editorElementId:string;
 	type:string;
+	changeListener:((el:EditorElement)=>void)[];
 	constructor(editorElementId:string, type:string){
 		this.editorElementId = editorElementId;
 		this.type = type;
+		this.changeListener = [];
+	}
+	triggerChange(){
+		this.changeListener.forEach((listener) => {
+			listener(this);
+		})
 	}
 	toggleEditor(){
 		console.error("Should be implemented by Class");
 	}
 	delete (){
-		// Nothing to do...
+		this.triggerChange();
 	}
 	async serialize():Promise<SerializedPanelState>{
 		throw Error("Object serialization should be implemented by child class");
@@ -73,6 +80,7 @@ class EditorText extends EditorElement{
 	}
 
 	toggleEditor(){
+		this.triggerChange();
 		if (this.pageElement.classList.contains("editMode")){
 			this.pageElement.classList.remove("editMode");
 			this.render();
@@ -208,6 +216,7 @@ class EditorPicture extends EditorElement{
 
 	toggleEditor(){
 		if (this.pageElement.classList.contains("editMode")){
+			this.triggerChange();
 			this.pageElement.classList.remove("editMode");
 			if (this.linkSelectorElement.value)
 				this.imageElement.src = this.linkSelectorElement.value;
@@ -331,6 +340,7 @@ class EditorAction extends EditorElement{
 
 	add_row(){
 		this.data.push([false, null, null, null]);
+		this.triggerChange();
 		this.render();
 	}
 
@@ -341,6 +351,7 @@ class EditorAction extends EditorElement{
 				let in_data = document.createElement("input");
 				in_data.onblur = (e) => {
 					this.data[row][col] = in_data.value;
+					this.triggerChange();
 					this.render();
 				}
 				result.replaceChildren(in_data);
@@ -375,7 +386,8 @@ class EditorAction extends EditorElement{
 		{
 			let in_data = document.createElement("input");
 			in_data.onblur = (e) => {
-				this.data[row][col] = in_data.value;
+					this.triggerChange();
+					this.data[row][col] = in_data.value;
 				this.render();
 			}
 			result.appendChild(in_data);

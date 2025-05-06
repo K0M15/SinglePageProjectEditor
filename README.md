@@ -5,7 +5,7 @@ For me, it should replace the Android/Google Notice app, which limits myself in 
 
 This could be a project, an event, or just todo-list
 
-Target is, to have it written in HTML, Vanilla CSS and Vanilla JS.
+Techstack is Typescript and Vite, maybe i'll add somthing to work on SVG images
 
 Functionaly, this consists of templates which can be added to a site.
 Each Template should be able to provide an Edit-Functionality
@@ -38,7 +38,16 @@ This project is in the early stages of development.
 - Dates / Planer
 - Tables
 - A calculator
-- A Help Overlay
+- A table to describe connection with addable cols
+```
+Database | Server | Client
+                    Login
+           Lookup
+Send
+           Check
+           Approve
+                   Accept
+```
 
 ### Functionality
  - Save as new page (to keep contents)
@@ -46,6 +55,7 @@ This project is in the early stages of development.
  - CO-Working
  - Create Plugin System for Elements. Define class better and put some description of the button, the new Element in there
  - Maybe create hooks for site load or something
+ - A Help Overlay
 
 ## BUGS
  - While reconstructing the site and adding new elements, id could occure double. This should be fixed in the future when switching to a total oop model, since the app should recive an id-counter (or better)

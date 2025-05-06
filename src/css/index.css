@@ -5,6 +5,10 @@ body {
 	width: calc(80ch);
 	margin: 0 auto 0 auto;
 }
+body > button {
+	margin-left: 5px;
+	margin-right:5px;
+}
 .displayText blockquote {
 	font-family: 'Courier New', Courier, monospace;
 	background-color: darkgray;
@@ -64,4 +68,20 @@ table .border{
 }
 .border td{
 	padding:10px
+}
+.modal-display-login{
+	max-width: calc(50ch);
+	text-align: center;
+}
+
+.modal-display-login input {
+	margin: 5px;
+}
+.modal-display-login button {
+	margin: 5px;
+}
+.modal-display-login .info-text {
+	flex:1;
+	min-width: 0;
+	margin: 20px;
 }
