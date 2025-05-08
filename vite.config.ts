@@ -16,6 +16,8 @@ export default defineConfig({
       '/register':proxyConf,
       '/check':proxyConf,
       '/toc':proxyConf,
+      '/store':proxyConf,
+      '/download':proxyConf,
     }
   }
 });

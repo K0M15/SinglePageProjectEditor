@@ -1,4 +1,4 @@
-import { SerializedPanelState } from "./App";
+import { App, SerializedPanelState } from "./App";
 
 enum EditorType{
 	TEXT,
@@ -7,8 +7,8 @@ enum EditorType{
 }
 
 export interface EditorElementDescription{
-	cls:new (...args:any[]) => EditorElement;
-	fromObject:(obj:SerializedPanelState) => EditorElement;
+	cls:new (editorElementId:string, parent:HTMLElement, options:any) => EditorElement;
+	fromObject:(obj:SerializedPanelState, parent:HTMLElement) => EditorElement;
 	name:string;
 	description:string;
 }
@@ -35,11 +35,11 @@ export class EditorElement{
 	delete (){
 		this.triggerChange();
 	}
-	async serialize():Promise<SerializedPanelState>{
+	async serialize(app:App):Promise<SerializedPanelState>{
 		throw Error("Object serialization should be implemented by child class");
 	}
 
-	static fromDataObj(obj:SerializedPanelState):EditorElement{
+	static fromDataObj(obj:SerializedPanelState, loadFile:(id:string, cache:Cache)=>Promise<string>):EditorElement{
 		throw Error("Object serialization should be implemented by child class");
 	}
 }
@@ -49,7 +49,7 @@ class EditorText extends EditorElement{
 	displayElement;
 	textareaElement;
 	buttonContainer;
-	constructor(editorElementId:string) {
+	constructor(editorElementId:string, parent:HTMLElement) {
 		super(editorElementId, "Text");
 		this.pageElement = document.createElement("div");
 		this.pageElement.classList.add("editorText");
@@ -74,9 +74,7 @@ class EditorText extends EditorElement{
 		this.displayElement.classList.add("displayText");
 		this.pageElement.appendChild(this.displayElement);
 		// Append to body
-		document.body.insertBefore(
-			this.pageElement,
-			document.getElementById("pageEnd"));
+		parent.appendChild(this.pageElement);
 	}
 
 	toggleEditor(){
@@ -147,7 +145,7 @@ class EditorText extends EditorElement{
 		super.delete();
 	}
 	
-	async serialize(){
+	async serialize(app:App){
 		return {
 			panelType:this.type,
 			data:this.textareaElement.value,
@@ -155,11 +153,11 @@ class EditorText extends EditorElement{
 		};
 	}
 
-	static fromDataObj(obj:SerializedPanelState){
+	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement){
 		if (obj.id === undefined || obj.data === undefined){
 			throw Error("obj corrupted");
 		}
-		const res = new EditorText(obj.id);
+		const res = new EditorText(obj.id, parent);
 		res.textareaElement.value = obj.data;
 		res.render();
 		return res;
@@ -172,7 +170,7 @@ class EditorPicture extends EditorElement{
 	editorElement;
 	fileSelectorElement;
 	linkSelectorElement;
-	constructor(editorElementId:string){
+	constructor(editorElementId:string, parent:HTMLElement){
 		super(editorElementId, "Picture");
 		this.pageElement = document.createElement("div");
 		this.pageElement.classList.add("editorPicture", "editMode");
@@ -209,9 +207,7 @@ class EditorPicture extends EditorElement{
 		this.pageElement.ondblclick = () => {
 			this.toggleEditor();
 		};
-		document.body.insertBefore(
-			this.pageElement,
-			document.getElementById("pageEnd"));
+		parent.appendChild(this.pageElement);
 	}
 
 	toggleEditor(){
@@ -258,23 +254,37 @@ class EditorPicture extends EditorElement{
 		return cacheKey;
 	}
 	
-	async serialize(){
-		return {
+	async saveLoadedImageRemote(app:App){
+		const cache = await caches.open("spe-images");
+		const response = await cache.match(`http://synthetic.spe/${this.editorElementId}`);
+		if (response === undefined)
+			throw Error(`Cannot read ${this.id}`);
+		const blob = await response.blob();
+		app.client.saveFile(this.editorElementId, blob);
+	}
+
+	async serialize(app:App){
+		const result = {
 			id:this.editorElementId,
 			panelType:this.type,
 			data:await this.saveLoadedImageData(),
-		};
+		}
+		await this.saveLoadedImageRemote(app);
+		return result;
 	}
 
-	static fromDataObj(obj:SerializedPanelState){
+	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement, load_file:(id:string, cache:Cache)=>Promise<string>){
 		if (obj.id === undefined || obj.data === undefined){
 			throw Error("obj corrupted");
 		}
-		const res = new EditorPicture(obj.id);
+		const res = new EditorPicture(obj.id, parent);
 		caches.open("spe-images").then((cache) => 
-			cache.match(obj.data).then((resp) => {
-				if (resp === undefined)
-					throw Error(`No match for ${obj.data} in cache "spe-images". Corrupted data?`);
+			cache.match(obj.data).then(async (resp) => {
+				if (resp === undefined){
+					resp = await cache.match(await load_file(obj.id, cache));
+					if (resp === undefined)
+						throw Error(`File not found on remote or local. FileID: ${obj.id}`)
+				}
 				resp.blob().then((blob) => {
 					res.imageElement.src = URL.createObjectURL(blob);
 					res.linkSelectorElement.value = res.imageElement.src;
@@ -295,16 +305,14 @@ type EditorActionGrid = Array<EditorActionCol>;
 class EditorAction extends EditorElement{
 	pageElement:HTMLDivElement;
 	data:EditorActionGrid;
-	constructor(editorElementId:string){
+	constructor(editorElementId:string, parent:HTMLElement){
 		super(editorElementId, "Action");
 		this.data = [
 			["", "Description", "Responsible", "Date"]
 		]
 		this.pageElement = document.createElement("div");
 		this.pageElement.classList.add("editorAction");
-		document.body.insertBefore(
-			this.pageElement,
-			document.getElementById("pageEnd"));
+		parent.appendChild(this.pageElement);
 		this.render();
 	}
 
@@ -403,11 +411,11 @@ class EditorAction extends EditorElement{
 		};
 	}
 
-	static fromDataObj(obj:SerializedPanelState){
+	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement){
 		if (obj.id === undefined || obj.data === undefined){
 			throw Error("obj corrupted");
 		}
-		const res = new EditorAction(obj.id);
+		const res = new EditorAction(obj.id, parent);
 		res.data = JSON.parse(obj.data);
 		res.render();
 		return res;

@@ -5,9 +5,14 @@ body {
 	width: calc(80ch);
 	margin: 0 auto 0 auto;
 }
-body > button {
-	margin-left: 5px;
-	margin-right:5px;
+.controlElement{
+	position: fixed;
+	top: 0;
+	width: 100%;
+	z-index: 1000;
+}
+#panel-content{
+	padding-top: 40px;
 }
 .displayText blockquote {
 	font-family: 'Courier New', Courier, monospace;

@@ -18,6 +18,7 @@ export class frontendClient{
     }
 
     set isLoggedIn(val:boolean){
+        console.log(`isLoggedIn ${val}`);
         if (this._isLoggedIn == val)
             return ;
         this._isLoggedIn = val;
@@ -42,11 +43,12 @@ ${response.status}and message ${await response.body?.getReader().read()}`);
     }
 
     async login(email:string, password:string){
+        console.log("Loggin in...");
         const response = await fetch("/login", {
             method:"POST",
             credentials: 'include',
             headers: {
-              'Content-Type': 'application/json'
+            'Content-Type': 'application/json'
             },
             body:JSON.stringify({
                 email:email,
@@ -130,5 +132,33 @@ ${response.status}and message ${await response.body?.getReader().read()}`);
         if (!response.ok)
             throw Error(`Request returned status ${response.status}`);
         return ;
+    }
+
+    async saveFile(id:string, data:Blob){
+        const formData = new FormData();
+        // "file" is the key your server expects in request.files["file"]
+        formData.append("files", data, "upload.bin");
+      
+        const response = await fetch(`/store/${encodeURIComponent(id)}`, {
+          method: "POST",
+          body: formData,
+        });
+      
+        if (!response.ok) {
+          throw new Error(`Failed to save file for id ${id}: ${response.statusText}`);
+        }
+    }
+
+    async loadFile(id:string, cache:Cache){
+        const response = await fetch(`/download/${id}`)
+        if (!response.ok)
+            throw Error(`File ${id} couldnt be loaded from remote`);
+        const blob = await response.blob();
+        const cacheKey = `${window.location.origin}/download/${id}`
+        await cache.put(
+            new Request(cacheKey),
+            new Response(blob, {headers: {"Content-Type": blob.type}})
+        )
+        return cacheKey;
     }
 }

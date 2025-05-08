@@ -10,8 +10,8 @@ class AppState{
 		this.pageElements = [];
 	}
 
-	async serialize(){
-		return (await Promise.all(this.pageElements.map(el => el.serialize())));
+	async serialize(app:App){
+		return (await Promise.all(this.pageElements.map(el => el.serialize(app))));
 	}
 
 	push(...args:EditorElement[]){
@@ -86,36 +86,37 @@ class StateHandler{
 		}
 	}
 
-	preLoadRemote(id:string, app:App){
-		app.client.requestDocument(id).then((res) => {
-			localStorage.setItem(id, JSON.stringify(res));
-		})
+	async preLoadRemote(id:string, app:App){
+		const res = await app.client.requestDocument(id);
+		localStorage.setItem(id, JSON.stringify(res));
 	}
 
-	loadAvailableStatesRemote(app:App){
-		app.client.getOverview().then( (remoteStates) => {
-			remoteStates.forEach((val) => {
-				const idx = this.availableStates.findIndex(state => state.id == val.id)
-				if (idx == -1){
-					this.availableStates.push(val);
-					this.preLoadRemote(val.id, app);
+	async loadAvailableStatesRemote(app:App){
+		const remoteStates = await app.client.getOverview();
+		let ctr = 0;
+		while (ctr < remoteStates.length){
+			const val  = remoteStates[ctr]
+			const idx = this.availableStates.findIndex(state => state.id == val.id)
+			if (idx == -1){
+				this.availableStates.push(val);
+				this.preLoadRemote(val.id, app);
+			}
+			else{
+				if (this.availableStates[idx].ts < val.ts)
+				{
+					Object.assign(this.availableStates[idx], val);
+					await this.preLoadRemote(val.id, app);
 				}
-				else{
-					if (this.availableStates[idx].ts < val.ts)
-					{
-						Object.assign(this.availableStates[idx], val);
-						this.preLoadRemote(val.id, app);
-					}
-					else
-					{
-						const data = localStorage.getItem(val.id);
-						if (data == null)
-							throw Error(`Local describted project ${val.name ?? val.id} not found`);
-						app.client.saveDocument(val.id, JSON.parse(data) as SerializedPanelState[]);
-					}
+				else
+				{
+					const data = localStorage.getItem(val.id);
+					if (data == null)
+						throw Error(`Local describted project ${val.name ?? val.id} not found`);
+					await app.client.saveDocument(val.id, JSON.parse(data) as SerializedPanelState[]);
 				}
-			})
-		})
+			}
+			ctr++;
+		}
 	}
 
 	updateAvailableStates(app:App){
@@ -191,7 +192,7 @@ class StateHandler{
 		modal.appendChild(table);
 	}
 
-	loadState(stateId:string, availablePanels:EditorElementDescription[]){
+	loadState(stateId:string, availablePanels:EditorElementDescription[], parent:HTMLElement){
 		//check if even available or error
 		const newState = this.availableStates.find(st => st.id == stateId);
 		if (newState === undefined)
@@ -206,7 +207,7 @@ class StateHandler{
 			let pan = availablePanels.find(el => el.name == data[i].panelType);
 			if (pan === undefined)
 				throw Error(`Type ${data[i].panelType} not found in available panels. Maybe extension not loaded?`);
-			const element = pan.fromObject(data[i]);
+			const element = pan.fromObject(data[i], parent);
 			this.state.pageElements.push(element);
 		}
 	}
@@ -243,7 +244,7 @@ class StateHandler{
 				this.openedState.id = generateId();
 			this.openedState.name = newName;
 			this.saveAvailableStates(app);
-			this.state.serialize().then((data) =>{
+			this.state.serialize(app).then((data) =>{
 				localStorage.setItem(this.openedState.id as string, JSON.stringify(data));
 				saveRemote(data);
 			})
@@ -260,7 +261,7 @@ class StateHandler{
 						throw Error(`Could not save current state ${stateID}, no state with id found.`);
 					this.openedState.id = stateID;
 					this.saveAvailableStates(app);
-					this.state.serialize().then((data) => {
+					this.state.serialize(app).then((data) => {
 						localStorage.setItem(this.openedState.id as string, JSON.stringify(data));
 						saveRemote(data);
 					});
@@ -304,72 +305,74 @@ export class App{
 		})
 		this.client.onStateChange = (loggedIn:boolean) => {
 			if (loggedIn){
-				this.stateHandler.loadAvailableStatesRemote(this); 
+				this.stateHandler.loadAvailableStatesRemote(this);
+				document.getElementById("body-login-btn")?.classList.add("hidden");
+			}
+			else{
+				document.getElementById("body-login-btn")?.classList.remove("hidden");
 			}
 		}
 	}
 
 	areCookiesAllowed():boolean{
 		const cookiesAccepted = localStorage.getItem("cookiesAccepted");
-		if (cookiesAccepted == null)
-			this.displayCookieQuestion()
+		if (cookiesAccepted == null){
+			// this.displayCookieQuestion()
+		}
 	}
-
-// 	async displayCookieQuestion(){
-// 		this.showOverlay(this.createElement("div", {
-// 			classList:["modal"],
-// 			children:[
-// 				this.createElement("div", {
-// 					innerText: "Do you allow cookies or other data to be saved?\
-//  This page relies a lot on it, and you wont be able to save any data if you dont\
-//  accept.",
-// 				}),
-// 			]
-// 		}))
-// 	}
 
 	setupPage(){
 		document.title = "SingePageEditor"
 		const body = document.body;
 		//	PANEL BUTTONS
+		const topElement = this.createElement("div",
+			{
+				classList: ["pageEnd", "controlElement"],
+				parent:body,
+			}
+		)
+		const contentEl = this.createElement("div", {
+			id:"panel-content",
+			parent:body
+		})
 		for (const panel of this.availablePanels)
 		{
-			const button = this.createElement("button", {
+			this.createElement("button", {
 				innerText:panel.name,
 				classList:["btn-add-panel"],
 				onClick:() => {
-					this.stateHandler.addPanel(new panel.cls(generateId()))
+					this.stateHandler.addPanel(new panel.cls(generateId(), contentEl, {}))
 				},
-				parent:body
+				parent:topElement
 			});
-		}
-		body.firstElementChild?.classList.add("pageEnd");
-		this.createElement("br", {parent:body})
+		}		
+		this.createElement("br", {parent:topElement})
 		//	LOAD AND SAVE BUTTONS
 		this.createElement("button", {
 			innerText:"Save",
 			onClick:() => {this.stateHandler.saveState(this);},
-			parent:body
+			parent:topElement
 		});
 		this.createElement("button", {
 			innerText:"Load (Browser",
 			onClick:() => {
 				this.stateHandler.selectAvailableState(this, (stateID) => {
-					this.stateHandler.loadState(stateID, this.availablePanels)
+					this.stateHandler.loadState(stateID, this.availablePanels, contentEl)
 					this.overlayClose();
 				});
 			},
-			parent:body
+			parent:topElement
 		});
 		this.createElement("button", {
 			innerText:"Login",
+			id:"body-login-btn",
 			onClick:() => {
 				this.displayLogin();
 			},
-			parent:body
+			parent:topElement
 		})
 		//Overlay
-		const overlay = this.createElement("div", {id:"overlay", classList:["overlay", "hidden"], parent:body})
+		const overlay = this.createElement("div", {id:"overlay", classList:["overlay", "hidden"], parent:topElement})
 		this.createElement("button", {
 			parent:overlay,
 			classList:["close_overlay_button"],
@@ -437,6 +440,7 @@ export class App{
 		const loginButton = this.createElement("button", {
 			innerText:"Login",
 			onClick: () => {
+				console.log("Is loggin in");
 				this.client.login(inputEmail.value, inputPassword.value).then( () => {
 					this.overlayClose();
 				})
@@ -465,6 +469,9 @@ export class App{
 			],
 			parent:modal,
 		})
+		formEl.onsubmit = (e) => {
+			e.preventDefault();
+		}
 		this.showOverlay(modal);
 	}
 	
