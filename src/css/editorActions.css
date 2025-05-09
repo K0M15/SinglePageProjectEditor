@@ -4,7 +4,7 @@
 .editorAction td {
 	text-align: left;
 }
-.editorAction button:not(.new) {
+.editorAction>table button:not(.new) {
 	all:unset;
 	color:blue;
 	cursor:pointer;

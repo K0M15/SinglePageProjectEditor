@@ -12,8 +12,14 @@ body {
 	z-index: 1000;
 }
 #panel-content{
-	padding-top: 40px;
+	padding-top: 55px;
 }
+
+#panel-content div{
+	min-height: 3rem;
+	margin: 1rem auto 0 auto;	
+}
+
 .displayText blockquote {
 	font-family: 'Courier New', Courier, monospace;
 	background-color: darkgray;
@@ -90,3 +96,11 @@ table .border{
 	min-width: 0;
 	margin: 20px;
 }
+
+.editorElement{
+	background-color: #eee;
+}
+.editorElement .elem-btn-cont {
+	position: absolute; left:10px; display: none;
+}
+.editorElement.editMode .elem-btn-cont {display: block;}

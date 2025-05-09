@@ -22,8 +22,6 @@ This project is in the early stages of development.
 - Actions
 
 ## Still to create
-- Delete Button to Pictures
-- Move the panels
 - Links in Text
 
 ### Templates

@@ -8,21 +8,124 @@ enum EditorType{
 
 export interface EditorElementDescription{
 	cls:new (editorElementId:string, parent:HTMLElement, options:any) => EditorElement;
-	fromObject:(obj:SerializedPanelState, parent:HTMLElement) => EditorElement;
+	fromObject:(
+		obj:SerializedPanelState,
+		parent:HTMLElement,
+		load_file:(...args:any[]) => Promise<string>,
+	) => EditorElement;
 	name:string;
 	description:string;
 }
 
 export interface SerializedElementDescription extends Partial<EditorElementDescription>{}
 
+function elementBuilder<K extends keyof HTMLElementTagNameMap>(
+	tagname:K,
+			options:Partial<{
+		parent:HTMLElement,
+		afterElement:HTMLElement,
+		beforeELement:HTMLElement,
+		classList:string[],
+		id:string,
+		innerText:string,
+		onClick:(this:GlobalEventHandlers, event:MouseEvent) => any,
+		children:Node[],
+		innerHTML:string,
+	}>
+): HTMLElementTagNameMap[K] {
+	const element = document.createElement(tagname);
+	Object.entries(options).forEach((val) => {
+		switch(val[0]){
+			case "parent":
+				if (options.afterElement || options.beforeELement)
+					throw Error("Only one can be set: parent or afterElement")
+				options.parent?.appendChild(element);
+				break;
+			case "afterElement":
+				if (options.parent || options.beforeELement)
+					throw Error("Only one can be set: parent or afterElement");
+				options.afterElement?.after(element);
+				break;
+			case "beforeElement":
+				if (options.parent || options.afterElement)
+					throw Error("");
+				options.beforeELement?.before(element);
+			case "classList":
+				element.classList.add(...options.classList ?? []);
+				break;
+			case "id":
+				element.id = options.id ?? element.id;
+				break;
+			case "innerText":
+				element.innerText = options.innerText ?? element.innerText;
+				break;
+			case "innerHTML":
+				element.innerHTML = options.innerHTML ?? element.innerHTML;
+				break;
+			case "onClick":
+				element.onclick = options.onClick ?? element.onclick;
+				break;
+			case "children":
+				element.append(...options.children ?? new Array<Node>())
+				break;
+			default:
+				break
+		}
+	});
+	return element;
+}
+
 export class EditorElement{
+	pageElement:HTMLDivElement;
+	buttonContainer:HTMLDivElement;
 	editorElementId:string;
 	type:string;
 	changeListener:((el:EditorElement)=>void)[];
-	constructor(editorElementId:string, type:string){
+	constructor(editorElementId:string, type:string, parent:HTMLElement){
+		this.pageElement = document.createElement("div");
+		this.pageElement.classList.add("editorElement");
+		// Delete Button
+		this.buttonContainer = elementBuilder("div", 
+			{
+				parent:this.pageElement,
+				classList:["elem-btn-cont"],
+				children:[
+					elementBuilder("button", {
+						innerText:"🗑️",
+						onClick:() => {
+							this.delete();
+						}
+					}),
+					elementBuilder("button", {
+						innerText:"⬆️",
+						onClick:() => {
+							this.moveUp();
+						}
+					}),
+					elementBuilder("button", {
+						innerText:"⬇️",
+						onClick:() => {
+							this.moveDown();
+						}
+					}),
+				]
+			}
+		)
+		
+		
+		document.createElement("div");
+		this.buttonContainer.classList.add("elem-btn-cont");
+		let deleteButton = document.createElement("button");
+		deleteButton.innerHTML = "🗑️";
+		deleteButton.onclick = () => {
+			this.delete();
+		}
+		this.buttonContainer.appendChild(deleteButton);
+		this.pageElement.appendChild(this.buttonContainer);
 		this.editorElementId = editorElementId;
 		this.type = type;
 		this.changeListener = [];
+		parent.appendChild(this.pageElement);
 	}
 	triggerChange(){
 		this.changeListener.forEach((listener) => {
@@ -39,30 +142,25 @@ export class EditorElement{
 		throw Error("Object serialization should be implemented by child class");
 	}
 
-	static fromDataObj(obj:SerializedPanelState, loadFile:(id:string, cache:Cache)=>Promise<string>):EditorElement{
+	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement, loadFile:(id:string, cache:Cache)=>Promise<string>):EditorElement{
 		throw Error("Object serialization should be implemented by child class");
+	}
+	
+	moveUp(){
+		this.pageElement.parentElement?.insertBefore(this.pageElement, this.pageElement.previousElementSibling);
+	}
+
+	moveDown(){
+		this.pageElement.parentElement?.insertBefore(this.pageElement, this.pageElement.nextElementSibling?.nextElementSibling);
 	}
 }
 
 class EditorText extends EditorElement{
-	pageElement;
 	displayElement;
 	textareaElement;
-	buttonContainer;
 	constructor(editorElementId:string, parent:HTMLElement) {
-		super(editorElementId, "Text");
-		this.pageElement = document.createElement("div");
+		super(editorElementId, "Text", parent);
 		this.pageElement.classList.add("editorText");
-		// Delete Button
-		this.buttonContainer = document.createElement("div");
-		this.buttonContainer.classList.add("elem-btn-cont");
-		let deleteButton = document.createElement("button");
-		deleteButton.innerHTML = "🗑️";
-		deleteButton.onclick = () => {
-			this.delete();
-		}
-		this.buttonContainer.appendChild(deleteButton);
-		this.pageElement.appendChild(this.buttonContainer);
 		// Textarea element for editor mode
 		this.textareaElement = document.createElement("textarea")
 		this.pageElement.appendChild(this.textareaElement);
@@ -73,8 +171,6 @@ class EditorText extends EditorElement{
 		this.displayElement = document.createElement("div");
 		this.displayElement.classList.add("displayText");
 		this.pageElement.appendChild(this.displayElement);
-		// Append to body
-		parent.appendChild(this.pageElement);
 	}
 
 	toggleEditor(){
@@ -153,7 +249,7 @@ class EditorText extends EditorElement{
 		};
 	}
 
-	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement){
+	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement, load_file:any){
 		if (obj.id === undefined || obj.data === undefined){
 			throw Error("obj corrupted");
 		}
@@ -165,14 +261,12 @@ class EditorText extends EditorElement{
 }
 
 class EditorPicture extends EditorElement{
-	pageElement;
 	imageElement;
 	editorElement;
 	fileSelectorElement;
 	linkSelectorElement;
 	constructor(editorElementId:string, parent:HTMLElement){
-		super(editorElementId, "Picture");
-		this.pageElement = document.createElement("div");
+		super(editorElementId, "Picture", parent);
 		this.pageElement.classList.add("editorPicture", "editMode");
 		this.imageElement = document.createElement("img");
 		this.imageElement.src = "";
@@ -207,7 +301,6 @@ class EditorPicture extends EditorElement{
 		this.pageElement.ondblclick = () => {
 			this.toggleEditor();
 		};
-		parent.appendChild(this.pageElement);
 	}
 
 	toggleEditor(){
@@ -258,7 +351,7 @@ class EditorPicture extends EditorElement{
 		const cache = await caches.open("spe-images");
 		const response = await cache.match(`http://synthetic.spe/${this.editorElementId}`);
 		if (response === undefined)
-			throw Error(`Cannot read ${this.id}`);
+			throw Error(`Cannot read ${this.editorElementId}`);
 		const blob = await response.blob();
 		app.client.saveFile(this.editorElementId, blob);
 	}
@@ -303,16 +396,19 @@ type EditorActionCol = Array<EditorActionCell>;
 type EditorActionGrid = Array<EditorActionCol>;
 
 class EditorAction extends EditorElement{
-	pageElement:HTMLDivElement;
 	data:EditorActionGrid;
 	constructor(editorElementId:string, parent:HTMLElement){
-		super(editorElementId, "Action");
+		super(editorElementId, "Action", parent);
 		this.data = [
 			["", "Description", "Responsible", "Date"]
 		]
-		this.pageElement = document.createElement("div");
 		this.pageElement.classList.add("editorAction");
-		parent.appendChild(this.pageElement);
+		this.pageElement.ondblclick = () => {
+			if (this.pageElement.classList.contains("editMode"))
+				this.pageElement.classList.remove("editMode");
+			else
+				this.pageElement.classList.add("editMode");
+		}
 		this.render();
 	}
 
@@ -343,7 +439,11 @@ class EditorAction extends EditorElement{
 		btn_add_new.classList.add("new");
 		row.appendChild(btn_add_new);
 		result.appendChild(row);
-		this.pageElement.replaceChildren(result);
+		let btn_cont = Array.from(this.pageElement.children).find(el => el.classList.contains("elem-btn-cont"));
+		if (btn_cont == undefined)
+			this.pageElement.replaceChildren(result);
+		else
+			this.pageElement.replaceChildren(btn_cont, result);
 	}
 
 	add_row(){
@@ -411,7 +511,7 @@ class EditorAction extends EditorElement{
 		};
 	}
 
-	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement){
+	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement, load_file:any){
 		if (obj.id === undefined || obj.data === undefined){
 			throw Error("obj corrupted");
 		}

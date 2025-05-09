@@ -192,7 +192,7 @@ class StateHandler{
 		modal.appendChild(table);
 	}
 
-	loadState(stateId:string, availablePanels:EditorElementDescription[], parent:HTMLElement){
+	loadState(stateId:string, availablePanels:EditorElementDescription[], parent:HTMLElement, load_file:(...args:any[]) => Promise<string>){
 		//check if even available or error
 		const newState = this.availableStates.find(st => st.id == stateId);
 		if (newState === undefined)
@@ -207,7 +207,7 @@ class StateHandler{
 			let pan = availablePanels.find(el => el.name == data[i].panelType);
 			if (pan === undefined)
 				throw Error(`Type ${data[i].panelType} not found in available panels. Maybe extension not loaded?`);
-			const element = pan.fromObject(data[i], parent);
+			const element = pan.fromObject(data[i], parent, load_file);
 			this.state.pageElements.push(element);
 		}
 	}
@@ -357,7 +357,7 @@ export class App{
 			innerText:"Load (Browser",
 			onClick:() => {
 				this.stateHandler.selectAvailableState(this, (stateID) => {
-					this.stateHandler.loadState(stateID, this.availablePanels, contentEl)
+					this.stateHandler.loadState(stateID, this.availablePanels, contentEl, this.client.loadFile)
 					this.overlayClose();
 				});
 			},
