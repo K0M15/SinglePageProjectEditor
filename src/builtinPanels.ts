@@ -111,17 +111,6 @@ export class EditorElement{
 				]
 			}
 		)
-		
-		
-		document.createElement("div");
-		this.buttonContainer.classList.add("elem-btn-cont");
-		let deleteButton = document.createElement("button");
-		deleteButton.innerHTML = "🗑️";
-		deleteButton.onclick = () => {
-			this.delete();
-		}
-		this.buttonContainer.appendChild(deleteButton);
-		this.pageElement.appendChild(this.buttonContainer);
 		this.editorElementId = editorElementId;
 		this.type = type;
 		this.changeListener = [];
