@@ -1,6 +1,7 @@
 .editorText {
 	width:100%;
 	align-items: center;
+	padding: 0.2rem;
 }
 .editorText textarea {
 	width:99%;

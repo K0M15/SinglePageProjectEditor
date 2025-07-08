@@ -236,6 +236,22 @@ class StateHandler{
 		})
 	}
 
+	async downloadStateAsJSON(app: App) {
+        const data = await this.state.serialize(app);
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        const filename = (this.openedState.name ? this.openedState.name : "state") + ".json";
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
 }
 
 export class App{
@@ -292,7 +308,7 @@ export class App{
 			parent:topElement
 		});
 		this.createElement("button", {
-			innerText:"Load (Browser",
+			innerText:"Load (Browser)",
 			onClick:() => {
 				this.stateHandler.selectAvailableState(this, (stateID) => {
 					this.stateHandler.loadState(stateID, this.availablePanels, contentEl)
@@ -300,6 +316,50 @@ export class App{
 				});
 			},
 			parent:topElement
+		});
+		this.createElement("button", {
+			innerText:"Save (Local)",
+			onClick:() => {this.stateHandler.downloadStateAsJSON(this);},
+			parent:topElement
+		});
+		const fileInput = this.createElement("input", {
+			parent: topElement
+		}) as HTMLInputElement;
+		fileInput.type = "file";
+		fileInput.accept = ".json,application/json";
+		fileInput.style.display = "none";
+		fileInput.onchange = async (e) => {
+			if (fileInput.files && fileInput.files.length > 0) {
+				const file = fileInput.files[0];
+				const text = await file.text();
+				try {
+					const data = JSON.parse(text);
+					// Clear current panels
+					this.stateHandler.purgeOpenedState();
+					// Load panels from JSON
+					if (Array.isArray(data)) {
+						// Old format: just array of panels
+						for (const panel of data) {
+							this.loadEditorElement(panel);
+						}
+					} else if (data.pageData) {
+						// New format: { pageData: [...] }
+						for (const panel of data.pageData) {
+							this.loadEditorElement(panel);
+						}
+					}
+				} catch (err) {
+					alert("Invalid JSON file.");
+				}
+			}
+		};
+		this.createElement("button", {
+			innerText: "Load (Local)",
+			onClick: () => {
+				// Trigger file input click
+				fileInput.click();
+			},
+			parent: topElement
 		});
 		//Overlay
 		const overlay = this.createElement("div", {id:"overlay", classList:["overlay", "hidden"], parent:topElement})
@@ -317,7 +377,7 @@ export class App{
 		const element = this.availablePanels.find( av => av.name == object.panelType);
 		if (element === undefined)
 			throw Error(`Type ${object.panelType} not found in available panels. Maybe extension not loaded?`);
-		this.stateHandler.addPanel(new element.cls(object.id));
+		this.stateHandler.addPanel(element.fromObject(object, document.getElementById("panel-content") as HTMLElement));
 	}
 
 	showOverlay(modal:HTMLDivElement){

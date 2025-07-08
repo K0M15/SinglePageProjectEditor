@@ -18,6 +18,8 @@ body {
 #panel-content div{
 	min-height: 3rem;
 	margin: 1rem auto 0 auto;
+	border: 0px solid #ccc;
+	border-radius: 10px;
 }
 
 .displayText blockquote {
