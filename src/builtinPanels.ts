@@ -247,7 +247,7 @@ class EditorText extends EditorElement{
 		// Textarea element for editor mode
 		this.textareaElement = document.createElement("textarea")
 		this.pageElement.appendChild(this.textareaElement);
-		this.pageElement.ondblclick = this.toggleEditor
+		this.pageElement.ondblclick = () => {this.toggleEditor();}
 		// Mobile Touch Event Handler
 		const touchHandler = new TouchEventHandler();
 		touchHandler.onLongTouch = (ev) => {
