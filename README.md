@@ -20,6 +20,7 @@ This project is in the early stages of development.
 - Pictures
 - Saving & Loading using localStorage and some server (*not included*)
 - Actions
+- SWOT-Analysis
 
 ## Still to create
 - Links in Text
@@ -27,15 +28,14 @@ This project is in the early stages of development.
 ### Templates
 - 5Why
 - Fishbone
-- SWOT-Analysis
 - Actions
     - Additional Columns
     - Sortable
     - Moveable Columns
     - DateSelector
 - Dates / Planer
-- Tables
-- A calculator
+- Tables => to display data. maybe load csv?
+- A calculator with excel style inputs
 - A table to describe connection with addable cols
 ```
 Database | Server | Client

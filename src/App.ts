@@ -86,39 +86,6 @@ class StateHandler{
 		}
 	}
 
-	async preLoadRemote(id:string, app:App){
-		const res = await app.client.requestDocument(id);
-		localStorage.setItem(id, JSON.stringify(res));
-	}
-
-	async loadAvailableStatesRemote(app:App){
-		const remoteStates = await app.client.getOverview();
-		let ctr = 0;
-		while (ctr < remoteStates.length){
-			const val  = remoteStates[ctr]
-			const idx = this.availableStates.findIndex(state => state.id == val.id)
-			if (idx == -1){
-				this.availableStates.push(val);
-				this.preLoadRemote(val.id, app);
-			}
-			else{
-				if (this.availableStates[idx].ts < val.ts)
-				{
-					Object.assign(this.availableStates[idx], val);
-					await this.preLoadRemote(val.id, app);
-				}
-				else
-				{
-					const data = localStorage.getItem(val.id);
-					if (data == null)
-						throw Error(`Local describted project ${val.name ?? val.id} not found`);
-					await app.client.saveDocument(val.id, JSON.parse(data) as SerializedPanelState[]);
-				}
-			}
-			ctr++;
-		}
-	}
-
 	updateAvailableStates(app:App){
 		const idx = this.availableStates.findIndex(val => val.id == this.openedState.id);
 		if (idx == -1)
@@ -192,7 +159,7 @@ class StateHandler{
 		modal.appendChild(table);
 	}
 
-	loadState(stateId:string, availablePanels:EditorElementDescription[], parent:HTMLElement, load_file:(...args:any[]) => Promise<string>){
+	loadState(stateId:string, availablePanels:EditorElementDescription[], parent:HTMLElement):Promise<string>{
 		//check if even available or error
 		const newState = this.availableStates.find(st => st.id == stateId);
 		if (newState === undefined)
@@ -207,25 +174,12 @@ class StateHandler{
 			let pan = availablePanels.find(el => el.name == data[i].panelType);
 			if (pan === undefined)
 				throw Error(`Type ${data[i].panelType} not found in available panels. Maybe extension not loaded?`);
-			const element = pan.fromObject(data[i], parent, load_file);
+			const element = pan.fromObject(data[i], parent);
 			this.state.pageElements.push(element);
 		}
 	}
 
 	saveState(app:App){
-		function saveRemote(ser:SerializedPanelState[]){
-			if (app.client.isLoggedIn){
-				if (app.stateHandler.openedState.id === undefined)
-					throw Error("Opened state not saveable");
-				app.stateHandler.updateAvailableStates(app);
-				app.client.setOverview(app.stateHandler.availableStates);
-				app.client.saveDocument(
-					app.stateHandler.openedState.id,
-					ser
-				)
-			}
-		}
-
 		// First find state, then save, if not exist create new
 		if (this.openedState.id === undefined)
 			this.openedState.id = generateId();
@@ -246,7 +200,6 @@ class StateHandler{
 			this.saveAvailableStates(app);
 			this.state.serialize(app).then((data) =>{
 				localStorage.setItem(this.openedState.id as string, JSON.stringify(data));
-				saveRemote(data);
 			})
 			app.overlayClose();
 		}
@@ -256,14 +209,13 @@ class StateHandler{
 			app.overlayClose();
 			this.selectAvailableState(app,
 				(stateID) => {
-					const purgeState = this.availableStates.find(val => val.id == stateID);
+					const purgeState  = this.availableStates.find(val => val.id == stateID);
 					if (purgeState === null)
 						throw Error(`Could not save current state ${stateID}, no state with id found.`);
 					this.openedState.id = stateID;
 					this.saveAvailableStates(app);
 					this.state.serialize(app).then((data) => {
 						localStorage.setItem(this.openedState.id as string, JSON.stringify(data));
-						saveRemote(data);
 					});
 					app.overlayClose();
 				}
@@ -288,7 +240,6 @@ class StateHandler{
 
 export class App{
 	allowedCookies:boolean
-	client:FrontendClient
 	stateHandler:StateHandler;
 	availablePanels:EditorElementDescription[];
 	private overlayEventBuffer?:((this:GlobalEventHandlers, event:KeyboardEvent) => void) | null;
@@ -299,22 +250,9 @@ export class App{
 		this.availablePanels.push(...builtinPanels);
 		this.stateHandler = new StateHandler(this);
 		this.setupPage();
-		this.client = new FrontendClient(() => {
-			if (!isStandalone)
-				this.displayLogin();
-		})
-		this.client.onStateChange = (loggedIn:boolean) => {
-			if (loggedIn){
-				this.stateHandler.loadAvailableStatesRemote(this);
-				document.getElementById("body-login-btn")?.classList.add("hidden");
-			}
-			else{
-				document.getElementById("body-login-btn")?.classList.remove("hidden");
-			}
-		}
 	}
 
-	areCookiesAllowed():boolean{
+	checkCookiesAllowed():boolean{
 		const cookiesAccepted = localStorage.getItem("cookiesAccepted");
 		if (cookiesAccepted == null){
 			// this.displayCookieQuestion()
@@ -357,20 +295,12 @@ export class App{
 			innerText:"Load (Browser",
 			onClick:() => {
 				this.stateHandler.selectAvailableState(this, (stateID) => {
-					this.stateHandler.loadState(stateID, this.availablePanels, contentEl, this.client.loadFile)
+					this.stateHandler.loadState(stateID, this.availablePanels, contentEl)
 					this.overlayClose();
 				});
 			},
 			parent:topElement
 		});
-		this.createElement("button", {
-			innerText:"Login",
-			id:"body-login-btn",
-			onClick:() => {
-				this.displayLogin();
-			},
-			parent:topElement
-		})
 		//Overlay
 		const overlay = this.createElement("div", {id:"overlay", classList:["overlay", "hidden"], parent:topElement})
 		this.createElement("button", {
@@ -381,13 +311,6 @@ export class App{
 				this.overlayClose();
 			}
 		});
-	}
-
-	addNewEditorElement(type:string){
-		const element = this.availablePanels.find(elem => elem.name == type);
-		if (element === undefined)
-			throw Error(`Type ${type} not found in available panels. Maybe extension not loaded?`);
-		this.stateHandler.addPanel(new element.cls(generateId()));
 	}
 
 	loadEditorElement(object:SerializedPanelState){
@@ -425,54 +348,6 @@ export class App{
 			document.onkeydown = null;
 		else
 			document.onkeydown = this.overlayEventBuffer;
-	}
-
-	displayLogin(){
-		const modal = this.createElement("div", {
-			classList: ["modal", "modal-display-login"],
-		});
-		const inputEmail = this.createElement("input", {});
-		inputEmail.type = "text";
-		inputEmail.placeholder = "Email";
-		const inputPassword = this.createElement("input", {});
-		inputPassword.type = "password";
-		inputPassword.placeholder = "Password";
-		const loginButton = this.createElement("button", {
-			innerText:"Login",
-			onClick: () => {
-				console.log("Is loggin in");
-				this.client.login(inputEmail.value, inputPassword.value).then( () => {
-					this.overlayClose();
-				})
-			}
-		});
-		const registerButton = this.createElement("button", {
-			innerText:"Register",
-			onClick: () => {
-				this.client.register(inputEmail.value, inputPassword.value).then( () => {
-					this.overlayClose();
-				})
-			}
-		})
-
-		const formEl = this.createElement("form", {
-			children:[
-				this.createElement("div",{
-					classList:["info-text"],
-					innerHTML:"Currently, registration is not open to the public. If you know me, contact me and get a test account"
-				}),
-				inputEmail,
-				inputPassword,
-				document.createElement("br"),
-				loginButton,
-				registerButton
-			],
-			parent:modal,
-		})
-		formEl.onsubmit = (e) => {
-			e.preventDefault();
-		}
-		this.showOverlay(modal);
 	}
 	
 	generateStaticSite(){

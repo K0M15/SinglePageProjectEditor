@@ -1,9 +1,11 @@
 import { App, SerializedPanelState } from "./App";
+import { DatePicker } from "./CalendarElement"
 
 enum EditorType{
 	TEXT,
 	PICTURE,
 	ACTION,
+	SWOT,
 }
 
 export interface EditorElementDescription{
@@ -11,7 +13,6 @@ export interface EditorElementDescription{
 	fromObject:(
 		obj:SerializedPanelState,
 		parent:HTMLElement,
-		load_file:(...args:any[]) => Promise<string>,
 	) => EditorElement;
 	name:string;
 	description:string;
@@ -19,9 +20,9 @@ export interface EditorElementDescription{
 
 export interface SerializedElementDescription extends Partial<EditorElementDescription>{}
 
-function elementBuilder<K extends keyof HTMLElementTagNameMap>(
+export function elementBuilder<K extends keyof HTMLElementTagNameMap>(
 	tagname:K,
-			options:Partial<{
+	options:Partial<{
 		parent:HTMLElement,
 		afterElement:HTMLElement,
 		beforeELement:HTMLElement,
@@ -31,8 +32,7 @@ function elementBuilder<K extends keyof HTMLElementTagNameMap>(
 		onClick:(this:GlobalEventHandlers, event:MouseEvent) => any,
 		children:Node[],
 		innerHTML:string,
-	}>
-): HTMLElementTagNameMap[K] {
+	}>): HTMLElementTagNameMap[K] {
 	const element = document.createElement(tagname);
 	Object.entries(options).forEach((val) => {
 		switch(val[0]){
@@ -74,6 +74,51 @@ function elementBuilder<K extends keyof HTMLElementTagNameMap>(
 	});
 	return element;
 }
+
+function tableBuilder(cols:string[], data:any[]):HTMLTableElement{
+	const keys = Object.keys(data);
+	cols.forEach((el) => {
+		if (!(el in keys))
+			throw Error("Col not key of data")
+	})
+	const content = data.map((val) => {
+		return elementBuilder("tr", {
+			children: cols.map((col) => {
+				return elementBuilder("td", {
+					innerHTML:val[col] ?? ""
+				});
+			})
+		})
+	})
+	return elementBuilder("table", {
+		children: content
+	})
+}
+
+interface FormInputElement{
+	name:string,
+	type:"TEXT" | "PASSWORD" | "CHECK",
+}
+
+interface FormButtonElement{
+	name:string,
+	text:string,
+	callback:(ev: MouseEvent) => void
+}
+
+// function formBuilder(
+// 	input:FormInputElement[],
+// 	button:FormButtonElement[]
+// ){
+// 	return elementBuilder{"form", {
+// 		children:[
+// 			...input.map( (el) => {
+// 				const input = elementBuilder("input", {});
+// 				input.name = el.name
+// 			})
+// 		]
+// 	}}	
+// }
 
 export class EditorElement{
 	pageElement:HTMLDivElement;
@@ -131,7 +176,7 @@ export class EditorElement{
 		throw Error("Object serialization should be implemented by child class");
 	}
 
-	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement, loadFile:(id:string, cache:Cache)=>Promise<string>):EditorElement{
+	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement):EditorElement{
 		throw Error("Object serialization should be implemented by child class");
 	}
 	
@@ -238,7 +283,7 @@ class EditorText extends EditorElement{
 		};
 	}
 
-	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement, load_file:any){
+	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement){
 		if (obj.id === undefined || obj.data === undefined){
 			throw Error("obj corrupted");
 		}
@@ -336,37 +381,25 @@ class EditorPicture extends EditorElement{
 		return cacheKey;
 	}
 	
-	async saveLoadedImageRemote(app:App){
-		const cache = await caches.open("spe-images");
-		const response = await cache.match(`http://synthetic.spe/${this.editorElementId}`);
-		if (response === undefined)
-			throw Error(`Cannot read ${this.editorElementId}`);
-		const blob = await response.blob();
-		app.client.saveFile(this.editorElementId, blob);
-	}
-
 	async serialize(app:App){
 		const result = {
 			id:this.editorElementId,
 			panelType:this.type,
 			data:await this.saveLoadedImageData(),
 		}
-		await this.saveLoadedImageRemote(app);
+		await this.saveLoadedImageData();
 		return result;
 	}
 
-	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement, load_file:(id:string, cache:Cache)=>Promise<string>){
+	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement){
 		if (obj.id === undefined || obj.data === undefined){
 			throw Error("obj corrupted");
 		}
 		const res = new EditorPicture(obj.id, parent);
 		caches.open("spe-images").then((cache) => 
 			cache.match(obj.data).then(async (resp) => {
-				if (resp === undefined){
-					resp = await cache.match(await load_file(obj.id, cache));
-					if (resp === undefined)
-						throw Error(`File not found on remote or local. FileID: ${obj.id}`)
-				}
+				if (resp === undefined)
+					throw Error(`File not found on remote or local. FileID: ${obj.id}`)
 				resp.blob().then((blob) => {
 					res.imageElement.src = URL.createObjectURL(blob);
 					res.linkSelectorElement.value = res.imageElement.src;
@@ -459,10 +492,7 @@ class EditorAction extends EditorElement{
 		{
 			let check = document.createElement("input");
 			check.type = "checkbox";
-			check.onchange = () => {
-				console.log(check.checked);
-				this.data[row][col] = check.checked;
-			}
+			check.onchange = () => { this.data[row][col] = check.checked; }
 			if (typeof data == "boolean")
 				check.checked = data;
 			else 
@@ -481,13 +511,23 @@ class EditorAction extends EditorElement{
 		}   
 		else if (data === null || data == "")
 		{
-			let in_data = document.createElement("input");
-			in_data.onblur = (e) => {
+			if (col === 3){
+				let datepick = document.createElement("date-picker") as DatePicker;
+				datepick.addEventListener("change", (e: Event) => {
+					this.data[row][col] = (e.target as any).value || "";
+					this.triggerChange();
+					this.render();
+				});
+				result.appendChild(datepick);
+			}else{
+				let in_data = document.createElement("input");
+				in_data.onblur = (e) => {
 					this.triggerChange();
 					this.data[row][col] = in_data.value;
-				this.render();
+					this.render();
+				}
+				result.appendChild(in_data);
 			}
-			result.appendChild(in_data);
 		}
 		return result;
 	}
@@ -500,7 +540,7 @@ class EditorAction extends EditorElement{
 		};
 	}
 
-	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement, load_file:any){
+	static fromDataObj(obj:SerializedPanelState, parent:HTMLElement){
 		if (obj.id === undefined || obj.data === undefined){
 			throw Error("obj corrupted");
 		}
@@ -509,6 +549,174 @@ class EditorAction extends EditorElement{
 		res.render();
 		return res;
 	}
+}
+
+interface SwotEntry {
+	name:string,
+	description:string,
+	action:{
+		description:string,
+		person:string,
+		targetDate:Date
+	}
+};
+class EditorSWOT extends EditorElement {
+	strength:SwotEntry[];
+	weakness:SwotEntry[];
+	oppertunity:SwotEntry[];
+	thread:SwotEntry[];
+	constructor(id:string, parent:HTMLElement)
+	{
+		super(id, "SWOT", parent);
+		this.strength = [],
+		this.weakness = [],
+		this.oppertunity = [],
+		this.thread = [],
+		this.render();
+	}
+	render(){
+		const content = [
+			elementBuilder("div", {
+				children:[
+					elementBuilder("h3", {innerText:"Strengths:"}),
+					tableBuilder(["name"], this.strength),
+					elementBuilder("button", {innerHTML:"+", onClick:(ev) => {
+						// reference this, add new empty line. maybe better to switch to tables
+						// or work with an overlay?
+					}}),
+					elementBuilder("h3", {innerText:"Weaknesses:"}),
+					tableBuilder(["name"], this.weakness),
+					elementBuilder("button", {innerHTML:"+"}),
+					elementBuilder("h3", {innerText:"Oppertunitys:"}),
+					tableBuilder(["name"], this.oppertunity),
+					elementBuilder("button", {innerHTML:"+"}),
+					elementBuilder("h3", {innerText:"Threads:"}),
+					tableBuilder(["name"], this.thread),
+					elementBuilder("button", {innerHTML:"+"}),
+				]
+			})
+		]
+		let btn_cont = Array.from(this.pageElement.children).find(el => el.classList.contains("elem-btn-cont"));
+		if (btn_cont == undefined)
+			this.pageElement.replaceChildren(...content);
+		else
+			this.pageElement.replaceChildren(btn_cont, ...content);
+	}
+	serialize(app: App): Promise<SerializedPanelState> {
+		return new Promise((res) => {
+			res({
+				id:this.editorElementId,
+				panelType:this.type,
+				data:JSON.stringify({
+					strength:this.strength,
+					weakness:this.weakness,
+					oppertunity:this.oppertunity,
+					thread:this.thread,
+				})
+			});
+		});
+	}
+	
+	static fromDataObj(obj: SerializedPanelState, parent: HTMLElement): EditorElement {
+		if (obj.id === undefined || obj.data === undefined){
+			throw Error("obj corrupted");
+		}
+		const swot = new EditorSWOT(obj.id, parent)
+		const data = JSON.parse(obj.data);
+		swot.strength = data.strength ?? [];
+		swot.weakness = data.weakness ?? [];
+		swot.oppertunity = data.oppertunity ?? [];
+		swot.thread = data.thread ?? [];
+		swot.render();
+		return (swot);
+	}
+}
+
+class EditorTimestream extends EditorElement {
+	data:{
+		timestamp:Date,
+		description:string,
+	}[]
+	showOverlay?:(modal:HTMLElement)=>void;
+	constructor(id:string, parent:HTMLElement){
+		super(id, "TIMELINE", parent)
+		this.data = [];
+	}
+
+	showDataOverlay(){
+		if (this.showOverlay === undefined)
+			throw Error("Show Overlay function not assigned to Timestream")
+		this.showOverlay(elementBuilder("div", {
+			classList:["modal"],
+			children:[
+			]
+		}))
+	}
+
+	addData(description:str, timestamp:Date){
+
+	}
+
+	render(){
+		const panel = elementBuilder("div",{
+			classList:['timeline-panel'],
+			children:[elementBuilder("div", {classList:["timeline-line"]})]
+		})
+		this.data.forEach( (el, index) => {
+			const isLeft = index % 2 == 0;
+			const children = []
+			if (isLeft){
+				children.push(
+					elementBuilder("div", {
+						classList: ["event-content"],
+						children:[
+							elementBuilder("div", {classList:["description"], innerText:el.description}),
+							elementBuilder("div", {classList:["timestamp"], innerText:el.timestamp.toLocaleString()}),
+						]
+					}),
+					elementBuilder("div", {
+						classList:["timeline-dot"]
+					}),
+					elementBuilder("div", {
+						classList:["timeline-spacer"]
+					}),
+				);
+			}else {
+				children.push(
+					elementBuilder("div", {
+						classList:["timeline-spacer"]
+					}),
+					elementBuilder("div", {
+						classList:["timeline-dot"]
+					}),
+					elementBuilder("div", {
+						classList: ["event-content"],
+						children:[
+							elementBuilder("div", {classList:["description"], innerText:el.description}),
+							elementBuilder("div", {classList:["timestamp"], innerText:el.timestamp.toLocaleString()}),
+						]
+					}),
+				);
+			}
+			const eventEL = panel.appendChild(elementBuilder("div", {
+				classList:["timeline-event", isLeft ? "left":"right"],
+				children:children,
+			}))
+			eventEL.setAttribute("data-date", el.timestamp.toLocaleString());
+		})
+		const buttons = this.pageElement.firstChild;
+		if (buttons)
+			this.pageElement.replaceChildren(buttons, panel);
+		else
+			this.pageElement.replaceChildren(panel);
+	}
+	serialize(app: App): Promise<SerializedPanelState> {
+		
+	}
+	static fromDataObj(obj: SerializedPanelState, parent: HTMLElement): EditorElement {
+
+	}
+
 }
 
 export const builtinPanels:EditorElementDescription[] = [
@@ -528,6 +736,12 @@ export const builtinPanels:EditorElementDescription[] = [
 		cls:EditorAction,
 		fromObject:EditorAction.fromDataObj,
 		name:"Action",
-		description:"An Element oranizing actions"
+		description:"An Element organizing actions"
+	},
+	{
+		cls:EditorSWOT,
+		fromObject:EditorAction.fromDataObj,
+		name:"SWOT",
+		description:"Create your consulting experience today!"
 	}
 ]
