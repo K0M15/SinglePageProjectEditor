@@ -177,6 +177,7 @@ export class EditorElement{
 	editorElementId:string;
 	type:string;
 	changeListener:((el:EditorElement)=>void)[];
+	moveListener:((el:EditorElement, direction:"up" | "down")=>void)[];
 	constructor(editorElementId:string, type:string, parent:HTMLElement){
 		this.pageElement = document.createElement("div");
 		this.pageElement.classList.add("editorElement");
@@ -210,6 +211,7 @@ export class EditorElement{
 		this.editorElementId = editorElementId;
 		this.type = type;
 		this.changeListener = [];
+		this.moveListener = [];
 		parent.appendChild(this.pageElement);
 	}
 	triggerChange(){
@@ -217,6 +219,13 @@ export class EditorElement{
 			listener(this);
 		})
 	}
+	
+	triggerMove(direction:"up" | "down"){
+		this.moveListener.forEach((listener) => {
+			listener(this, direction);
+		})
+	}
+
 	toggleEditor(){
 		console.error("Should be implemented by Class");
 	}
@@ -233,10 +242,12 @@ export class EditorElement{
 	
 	moveUp(){
 		this.pageElement.parentElement?.insertBefore(this.pageElement, this.pageElement.previousElementSibling);
+		this.triggerMove("up");
 	}
 
 	moveDown(){
 		this.pageElement.parentElement?.insertBefore(this.pageElement, this.pageElement.nextElementSibling?.nextElementSibling);
+		this.triggerMove("down");
 	}
 }
 

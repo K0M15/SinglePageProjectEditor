@@ -111,6 +111,21 @@ class StateHandler{
 		element.changeListener.push(() => {
 			this.triggerChange()
 		});
+		element.moveListener.push((el, direction) => {
+			const idx = this.state.pageElements.findIndex(e => e === el);
+			if (idx === -1) return;
+			if (direction === "up" && idx > 0) {
+				// Swap with previous
+				[this.state.pageElements[idx - 1], this.state.pageElements[idx]] =
+					[this.state.pageElements[idx], this.state.pageElements[idx - 1]];
+			}
+			if (direction === "down" && idx < this.state.pageElements.length - 1) {
+				// Swap with next
+				[this.state.pageElements[idx], this.state.pageElements[idx + 1]] =
+					[this.state.pageElements[idx + 1], this.state.pageElements[idx]];
+			}
+			this.triggerChange();
+		});
 		this.state.push(element);
 	}
 
