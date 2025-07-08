@@ -40,6 +40,7 @@ export class DatePicker extends HTMLElement{
             classList: ["calender-popup", "hidden"],
         });
         this.container.appendChild(this.input);
+        this.container.appendChild(icon);
         this.container.appendChild(this.calendar);
         this.renderCalendar(this.currentYear, this.currentMonth);
         document.addEventListener("click", (event) => {
