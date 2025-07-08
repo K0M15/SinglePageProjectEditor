@@ -13,3 +13,23 @@
 .editorActionLastRow {
 	text-align: right;
 }
+
+@media (max-width: 600px) {
+	.editorAction table {
+		width: 100%;
+	}
+	.editorAction td {
+		display: block;
+		width: 100%;
+	}
+	.editorAction>table button:not(.new) {
+		display: block;
+		margin-top: 5px;
+	}
+	.editorActionLastRow {
+		text-align: center;
+	}
+	.editorAction thead{
+		display: none;
+	}
+}

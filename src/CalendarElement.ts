@@ -15,7 +15,7 @@ export class DatePicker extends HTMLElement{
 
     connectedCallback() {
         const shadow = this.attachShadow({mode:"open"});
-        addGlobalStyle(shadow, "datePicker.css");
+        addGlobalStyle(shadow);
         this.container = shadow.appendChild(elementBuilder('div', {}));
         this.today = new Date();
         this.selectedDate = null;
@@ -39,8 +39,8 @@ export class DatePicker extends HTMLElement{
         this.calendar = elementBuilder("div", {
             classList: ["calender-popup", "hidden"],
         });
+        // this.container.appendChild(icon);
         this.container.appendChild(this.input);
-        this.container.appendChild(icon);
         this.container.appendChild(this.calendar);
         this.renderCalendar(this.currentYear, this.currentMonth);
         document.addEventListener("click", (event) => {

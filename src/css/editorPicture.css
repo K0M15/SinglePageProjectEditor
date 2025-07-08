@@ -4,6 +4,7 @@
 .editorPicture.editMode>.edit{
 	display: block;
 }
+
 .editorPicture>img { 
 	display: inline-block;
 	max-width: 100%;
@@ -15,4 +16,17 @@
 .editorPicture {
 	width:100%;
 	align-items: center;
+}
+
+@media (max-width: 600px) {
+	.editorPicture {
+		width: 100%;
+	}
+	.editorPicture>img {
+		max-width: 90%;
+	}
+	.editorPicture>button, input {
+		width: 22em;
+		margin: 0.5em;
+	}
 }

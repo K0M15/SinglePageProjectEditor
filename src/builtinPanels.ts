@@ -95,6 +95,55 @@ function tableBuilder(cols:string[], data:any[]):HTMLTableElement{
 	})
 }
 
+export class TouchEventHandler{
+	timer?:ReturnType<typeof setTimeout>;
+	lastTouch: number;
+	onLongTouch?:(ev:TouchEvent) => void ;
+	onShortTouch?:(ev:TouchEvent) => void ;
+	onDoubleTouch?:(ev:TouchEvent) => void ;
+	constructor(){
+		this.timer = undefined;
+		this.onLongTouch = undefined;
+		this.onShortTouch = undefined;
+		this.onDoubleTouch = undefined;
+		this.lastTouch = Date.now();
+	}
+
+	touchStartHandler(ev:TouchEvent){
+		if (this.timer !== undefined){
+			clearTimeout(this.timer);
+			this.timer = undefined;
+			if (Date.now() - this.lastTouch < 500){
+				this.onDoubleTouch ? this.onDoubleTouch(ev):() => {};
+				return;
+			}
+		}
+		else{
+			this.timer = setTimeout(() =>{
+				this.timer = undefined;
+				this.onLongTouch ? this.onLongTouch(ev):() => {}
+			}, 1000);
+		}
+	}
+
+	touchEndHandler(ev:TouchEvent){
+		if (this.timer !== undefined){
+			clearTimeout(this.timer);
+			this.timer = undefined;
+			this.onShortTouch ? this.onShortTouch(ev):() => {};
+		}
+		else{
+			this.lastTouch = Date.now();
+		}
+	}
+
+	attachToElement(el:HTMLElement){
+		el.addEventListener("touchstart", (ev) => this.touchStartHandler(ev), {passive:true});
+		el.addEventListener("touchend", (ev) => this.touchEndHandler(ev), {passive:true});
+		el.addEventListener("touchcancel", (ev) => this.touchEndHandler(ev), {passive:true});
+	}
+}
+
 interface FormInputElement{
 	name:string,
 	type:"TEXT" | "PASSWORD" | "CHECK",
@@ -198,9 +247,14 @@ class EditorText extends EditorElement{
 		// Textarea element for editor mode
 		this.textareaElement = document.createElement("textarea")
 		this.pageElement.appendChild(this.textareaElement);
-		this.pageElement.ondblclick = () => {
+		this.pageElement.ondblclick = this.toggleEditor
+		// Mobile Touch Event Handler
+		const touchHandler = new TouchEventHandler();
+		touchHandler.onLongTouch = (ev) => {
+			ev.preventDefault();
 			this.toggleEditor();
-		};
+		}
+		touchHandler.attachToElement(this.pageElement);
 		// Display element for display mode
 		this.displayElement = document.createElement("div");
 		this.displayElement.classList.add("displayText");
@@ -328,6 +382,13 @@ class EditorPicture extends EditorElement{
 		btn_close.onclick = () => {
 			this.toggleEditor();
 		}
+		// Mobile Touch Event Handler
+		const touchHandler = new TouchEventHandler();
+		touchHandler.onLongTouch = (ev) => {
+			ev.preventDefault();
+			this.toggleEditor();
+		}
+		touchHandler.attachToElement(this.pageElement);
 		btn_close.innerText = "Close";  
 		this.editorElement.appendChild(btn_close);
 		this.pageElement.appendChild(this.editorElement);
@@ -437,8 +498,11 @@ class EditorAction extends EditorElement{
 	render(){
 		let result = document.createElement("table")
 		// Header
-		let header = document.createElement("tr");
-		header.append(...this.data[0].map((e)=>{
+		let header = document.createElement("thead");
+		let headerRow = document.createElement("tr");
+		headerRow.classList.add("editorActionHeader");
+		header.appendChild(headerRow);
+		headerRow.append(...this.data[0].map((e)=>{
 			let el = document.createElement("th");
 			el.innerText = e as string;
 			return el;
@@ -521,6 +585,7 @@ class EditorAction extends EditorElement{
 				result.appendChild(datepick);
 			}else{
 				let in_data = document.createElement("input");
+				in_data.placeholder = "Enter " + this.data[0][col];
 				in_data.onblur = (e) => {
 					this.triggerChange();
 					this.data[row][col] = in_data.value;

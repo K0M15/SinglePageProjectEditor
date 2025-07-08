@@ -104,3 +104,57 @@ table .border{
 	position: absolute; left:10px; display: none;
 }
 .editorElement.editMode .elem-btn-cont {display: block;}
+
+@media (max-width: 600px) {
+	.editorElement .elem-btn-cont {
+		position: relative; left:auto; display: none;
+	}
+    body {
+        width: 100vw;
+        font-size: 18px;
+        /* padding: 0 0.5rem; */
+    }
+    #panel-content {
+        padding-top: 70px;
+    }
+    .editorElement {
+        margin: 0.5rem 0;
+        padding: 0.5rem;
+        font-size: 1rem;
+    }
+    .editorText textarea {
+        font-size: 1.1rem;
+        min-height: 4rem;
+    }
+    .editorPicture>img {
+        /* max-width: 70vw; */
+        height: auto;
+    }
+    .editorAction table,
+    .editorAction td,
+    .editorAction th {
+        font-size: 1rem;
+        word-break: break-word;
+    }
+    .editorAction table {
+        display: block;
+        overflow-x: auto;
+        width: 100%;
+    }
+    .modal {
+        width: 95vw;
+        max-width: 100vw;
+        padding: 1rem;
+    }
+    .elem-btn-cont button {
+        font-size: 1.2rem;
+        padding: 0.5rem 1rem;
+    }
+	
+	button, input, textarea {
+		font-size: 1rem;
+		padding: 0.5em;
+		border-radius: 6px;
+		min-height: 2.5em;
+	}
+}
