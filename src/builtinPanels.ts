@@ -541,7 +541,7 @@ class EditorAction extends EditorElement{
 	handleFieldData(data:EditorActionCell, row:number, col:number){
 		let result = document.createElement("td");
 		const add_edit_handler = () =>{
-			result.ondblclick = () => {
+			const handler = () =>{
 				let in_data = document.createElement("input");
 				in_data.onblur = (e) => {
 					this.data[row][col] = in_data.value;
@@ -551,7 +551,33 @@ class EditorAction extends EditorElement{
 				result.replaceChildren(in_data);
 				in_data.focus();
 			}
+			const touchHandler = new TouchEventHandler();
+			touchHandler.onLongTouch = (ev) => {
+				handler();
+			}
+			result.ondblclick = () => {
+				handler();
+			}
 		}
+		const add_date_edit_handler = () => {
+			const handler = () => {
+				let datepick = document.createElement("date-picker") as DatePicker;
+				datepick.addEventListener("date-picked", (e: Event) => {
+					this.data[row][col] = (e as any).detail || "";
+					this.triggerChange();
+					this.render();
+				});
+				result.replaceChildren(datepick);
+			}
+			const touchHandler = new TouchEventHandler();
+			touchHandler.onLongTouch = (ev) => {
+				handler();
+			}
+			result.ondblclick = () => {
+				handler();
+			}
+		}
+
 		if(col == 0)
 		{
 			let check = document.createElement("input");
@@ -564,8 +590,8 @@ class EditorAction extends EditorElement{
 			result.appendChild(check);
 		}
 		else if(typeof data == "string" && !isNaN(Date.parse(data))){
-			result.innerText = Date.parse(data).toLocaleString();
-			add_edit_handler();
+			result.innerText = data; //Date.parse(data).toLocaleString();
+			add_date_edit_handler();
 		}
 		else if (
 			(typeof data === "string")
@@ -577,8 +603,8 @@ class EditorAction extends EditorElement{
 		{
 			if (col === 3){
 				let datepick = document.createElement("date-picker") as DatePicker;
-				datepick.addEventListener("change", (e: Event) => {
-					this.data[row][col] = (e.target as any).value || "";
+				datepick.addEventListener("date-picked", (e: Event) => {
+					this.data[row][col] = (e as any).detail || "";
 					this.triggerChange();
 					this.render();
 				});

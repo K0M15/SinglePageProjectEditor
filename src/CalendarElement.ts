@@ -95,6 +95,11 @@ export class DatePicker extends HTMLElement{
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         this.input.value = dateStr;
         this.calendar.style.display = 'none';
+        const event = new CustomEvent('date-picked', {
+            detail: dateStr,
+        });
+        this.dispatchEvent(event);
+        this.selectedDate = new Date(year, month, day);
     }
     
     changeMonth(offset:number) {
