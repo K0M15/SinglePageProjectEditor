@@ -8,16 +8,5 @@ const proxyConf = {
 
 export default defineConfig({
   root: '.', // your project root
-  server:{
-    proxy:{
-      '/save':proxyConf,
-      '/load':proxyConf,
-      '/login':proxyConf,
-      '/register':proxyConf,
-      '/check':proxyConf,
-      '/toc':proxyConf,
-      '/store':proxyConf,
-      '/download':proxyConf,
-    }
-  }
+  base: '/SinglePageProjectEditor/', // base path for the project
 });
